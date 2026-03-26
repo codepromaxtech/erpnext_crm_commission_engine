@@ -167,7 +167,6 @@ doc_events = {
 
 # Fixtures
 # --------
-fixtures = ["Module Def"]
 
 # Extend DocType Class
 # ------------------------------
