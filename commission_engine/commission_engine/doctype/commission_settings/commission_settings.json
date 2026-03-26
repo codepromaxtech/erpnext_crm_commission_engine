@@ -1,0 +1,135 @@
+{
+    "actions": [],
+    "creation": "2026-03-26 00:00:00",
+    "doctype": "DocType",
+    "document_type": "Document",
+    "engine": "InnoDB",
+    "field_order": [
+        "first_invoice_section",
+        "onetime_salesperson_pct",
+        "onetime_manager_pct",
+        "col_break1",
+        "recurring_section",
+        "recurring_salesperson_pct",
+        "recurring_manager_pct",
+        "col_break2",
+        "accounting_section",
+        "commission_expense_account",
+        "commission_payable_account",
+        "auto_create_journal_entry"
+    ],
+    "fields": [
+        {
+            "fieldname": "first_invoice_section",
+            "fieldtype": "Section Break",
+            "label": "First Invoice (One-Time) Commission Rates",
+            "description": "Rates applied when a salesperson bills a customer for the FIRST time"
+        },
+        {
+            "default": "10",
+            "fieldname": "onetime_salesperson_pct",
+            "fieldtype": "Percent",
+            "label": "Salesperson Commission %",
+            "description": "E.g. 10 means 10% of invoice net amount",
+            "reqd": 1
+        },
+        {
+            "default": "2",
+            "fieldname": "onetime_manager_pct",
+            "fieldtype": "Percent",
+            "label": "Manager Commission %",
+            "description": "E.g. 2 means 2% of invoice net amount",
+            "reqd": 1
+        },
+        {
+            "fieldname": "col_break1",
+            "fieldtype": "Column Break"
+        },
+        {
+            "fieldname": "recurring_section",
+            "fieldtype": "Section Break",
+            "label": "Recurring Invoice Commission Rates",
+            "description": "Rates applied for all subsequent (recurring/subscription) invoices"
+        },
+        {
+            "default": "5",
+            "fieldname": "recurring_salesperson_pct",
+            "fieldtype": "Percent",
+            "label": "Salesperson Commission %",
+            "description": "E.g. 5 means 5% of invoice net amount",
+            "reqd": 1
+        },
+        {
+            "default": "1",
+            "fieldname": "recurring_manager_pct",
+            "fieldtype": "Percent",
+            "label": "Manager Commission %",
+            "description": "E.g. 1 means 1% of invoice net amount",
+            "reqd": 1
+        },
+        {
+            "fieldname": "col_break2",
+            "fieldtype": "Column Break"
+        },
+        {
+            "fieldname": "accounting_section",
+            "fieldtype": "Section Break",
+            "label": "Accounting (Optional)"
+        },
+        {
+            "fieldname": "commission_expense_account",
+            "fieldtype": "Link",
+            "label": "Commission Expense Account",
+            "options": "Account",
+            "description": "Debit account for journal entries"
+        },
+        {
+            "fieldname": "commission_payable_account",
+            "fieldtype": "Link",
+            "label": "Commission Payable Account",
+            "options": "Account",
+            "description": "Credit account for journal entries"
+        },
+        {
+            "default": "0",
+            "fieldname": "auto_create_journal_entry",
+            "fieldtype": "Check",
+            "label": "Auto-Create Journal Entry on Payment"
+        }
+    ],
+    "issingle": 1,
+    "links": [],
+    "modified": "2026-03-26 00:00:00",
+    "modified_by": "Administrator",
+    "module": "Commission Engine",
+    "name": "Commission Settings",
+    "owner": "Administrator",
+    "permissions": [
+        {
+            "create": 1,
+            "delete": 0,
+            "email": 1,
+            "print": 1,
+            "read": 1,
+            "report": 0,
+            "role": "System Manager",
+            "share": 1,
+            "write": 1
+        },
+        {
+            "create": 0,
+            "delete": 0,
+            "email": 1,
+            "print": 1,
+            "read": 1,
+            "report": 0,
+            "role": "Sales Manager",
+            "share": 0,
+            "write": 0
+        }
+    ],
+    "sort_field": "modified",
+    "sort_order": "DESC",
+    "states": [],
+    "track_changes": 1
+}

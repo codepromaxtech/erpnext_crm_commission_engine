@@ -1,0 +1,254 @@
+{
+    "actions": [],
+    "autoname": "CE-.YYYY.-.MM.-.#####",
+    "creation": "2026-03-26 00:00:00",
+    "doctype": "DocType",
+    "document_type": "Document",
+    "engine": "InnoDB",
+    "field_order": [
+        "invoice_section",
+        "sales_invoice",
+        "subscription",
+        "commission_type",
+        "commission_month",
+        "company",
+        "col_break1",
+        "customer",
+        "customer_name",
+        "base_amount",
+        "status",
+        "salesperson_section",
+        "sales_person",
+        "sales_person_name",
+        "commission_pct",
+        "commission_amount",
+        "col_break2",
+        "manager_section",
+        "manager",
+        "manager_name",
+        "manager_commission_pct",
+        "manager_commission_amount",
+        "accounting_section",
+        "journal_entry"
+    ],
+    "fields": [
+        {
+            "fieldname": "invoice_section",
+            "fieldtype": "Section Break",
+            "label": "Invoice Details"
+        },
+        {
+            "fieldname": "sales_invoice",
+            "fieldtype": "Link",
+            "label": "Sales Invoice",
+            "options": "Sales Invoice",
+            "reqd": 1,
+            "in_list_view": 1,
+            "in_standard_filter": 1
+        },
+        {
+            "fetch_from": "sales_invoice.subscription",
+            "fieldname": "subscription",
+            "fieldtype": "Link",
+            "label": "Subscription",
+            "options": "Subscription",
+            "read_only": 1
+        },
+        {
+            "fieldname": "commission_type",
+            "fieldtype": "Select",
+            "label": "Commission Type",
+            "options": "One-Time\nRecurring",
+            "reqd": 1,
+            "in_list_view": 1,
+            "in_standard_filter": 1
+        },
+        {
+            "fieldname": "commission_month",
+            "fieldtype": "Date",
+            "label": "Commission Month",
+            "description": "First day of the invoice's posting month",
+            "reqd": 1,
+            "in_list_view": 1,
+            "in_standard_filter": 1
+        },
+        {
+            "fieldname": "company",
+            "fieldtype": "Link",
+            "label": "Company",
+            "options": "Company",
+            "reqd": 1
+        },
+        {
+            "fieldname": "col_break1",
+            "fieldtype": "Column Break"
+        },
+        {
+            "fetch_from": "sales_invoice.customer",
+            "fieldname": "customer",
+            "fieldtype": "Link",
+            "label": "Customer",
+            "options": "Customer",
+            "read_only": 0,
+            "in_list_view": 1
+        },
+        {
+            "fetch_from": "sales_invoice.customer_name",
+            "fieldname": "customer_name",
+            "fieldtype": "Data",
+            "label": "Customer Name",
+            "read_only": 1
+        },
+        {
+            "fieldname": "base_amount",
+            "fieldtype": "Currency",
+            "label": "Invoice Net Amount",
+            "description": "The allocated amount from the Sales Team row",
+            "read_only": 1
+        },
+        {
+            "default": "Pending",
+            "fieldname": "status",
+            "fieldtype": "Select",
+            "label": "Status",
+            "options": "Pending\nPaid\nCancelled",
+            "reqd": 1,
+            "in_list_view": 1,
+            "in_standard_filter": 1
+        },
+        {
+            "fieldname": "salesperson_section",
+            "fieldtype": "Section Break",
+            "label": "Salesperson Commission"
+        },
+        {
+            "fieldname": "sales_person",
+            "fieldtype": "Link",
+            "label": "Sales Person",
+            "options": "Sales Person",
+            "reqd": 1,
+            "in_list_view": 1,
+            "in_standard_filter": 1
+        },
+        {
+            "fetch_from": "sales_person.sales_person_name",
+            "fieldname": "sales_person_name",
+            "fieldtype": "Data",
+            "label": "Sales Person Name",
+            "read_only": 1,
+            "fetch_if_empty": 1
+        },
+        {
+            "fieldname": "commission_pct",
+            "fieldtype": "Percent",
+            "label": "Commission Rate %",
+            "reqd": 1
+        },
+        {
+            "fieldname": "commission_amount",
+            "fieldtype": "Currency",
+            "label": "Commission Amount",
+            "read_only": 1
+        },
+        {
+            "fieldname": "col_break2",
+            "fieldtype": "Column Break"
+        },
+        {
+            "fieldname": "manager_section",
+            "fieldtype": "Section Break",
+            "label": "Manager Commission"
+        },
+        {
+            "fieldname": "manager",
+            "fieldtype": "Link",
+            "label": "Manager (Sales Person)",
+            "options": "Sales Person",
+            "in_standard_filter": 1
+        },
+        {
+            "fetch_from": "manager.sales_person_name",
+            "fieldname": "manager_name",
+            "fieldtype": "Data",
+            "label": "Manager Name",
+            "read_only": 1,
+            "fetch_if_empty": 1
+        },
+        {
+            "fieldname": "manager_commission_pct",
+            "fieldtype": "Percent",
+            "label": "Manager Commission Rate %"
+        },
+        {
+            "fieldname": "manager_commission_amount",
+            "fieldtype": "Currency",
+            "label": "Manager Commission Amount",
+            "read_only": 1
+        },
+        {
+            "fieldname": "accounting_section",
+            "fieldtype": "Section Break",
+            "label": "Accounting"
+        },
+        {
+            "fieldname": "journal_entry",
+            "fieldtype": "Link",
+            "label": "Journal Entry",
+            "options": "Journal Entry",
+            "read_only": 1
+        }
+    ],
+    "links": [
+        {
+            "group": "Sales",
+            "link_doctype": "Sales Invoice",
+            "link_fieldname": "name"
+        }
+    ],
+    "modified": "2026-03-26 00:00:00",
+    "modified_by": "Administrator",
+    "module": "Commission Engine",
+    "name": "Commission Entry",
+    "naming_rule": "Expression (old style)",
+    "owner": "Administrator",
+    "permissions": [
+        {
+            "create": 1,
+            "delete": 1,
+            "email": 1,
+            "print": 1,
+            "read": 1,
+            "report": 1,
+            "role": "System Manager",
+            "share": 1,
+            "write": 1
+        },
+        {
+            "create": 0,
+            "delete": 0,
+            "email": 1,
+            "print": 1,
+            "read": 1,
+            "report": 1,
+            "role": "Sales Manager",
+            "share": 1,
+            "write": 1
+        },
+        {
+            "create": 0,
+            "delete": 0,
+            "email": 0,
+            "print": 1,
+            "read": 1,
+            "report": 1,
+            "role": "Sales User",
+            "share": 0,
+            "write": 0
+        }
+    ],
+    "sort_field": "commission_month",
+    "sort_order": "DESC",
+    "states": [],
+    "title_field": "sales_invoice",
+    "track_changes": 1
+}
