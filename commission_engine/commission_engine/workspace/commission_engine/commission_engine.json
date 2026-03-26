@@ -1,0 +1,89 @@
+{
+    "app": "commission_engine",
+    "charts": [],
+    "content": "[{\"id\":\"ce_header1\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Commissions</b></span>\",\"col\":12}},{\"id\":\"ce_card1\",\"type\":\"card\",\"data\":{\"card_name\":\"Commission Engine\",\"col\":4}},{\"id\":\"ce_header2\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Reports</b></span>\",\"col\":12}},{\"id\":\"ce_card2\",\"type\":\"card\",\"data\":{\"card_name\":\"Commission Reports\",\"col\":4}},{\"id\":\"ce_header3\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Settings</b></span>\",\"col\":12}},{\"id\":\"ce_card3\",\"type\":\"card\",\"data\":{\"card_name\":\"Commission Settings Card\",\"col\":4}}]",
+    "creation": "2026-03-26 00:00:00",
+    "custom_blocks": [],
+    "docstatus": 0,
+    "doctype": "Workspace",
+    "for_user": "",
+    "hide_custom": 0,
+    "icon": "accounting",
+    "idx": 0,
+    "is_hidden": 0,
+    "label": "Commission Engine",
+    "links": [
+        {
+            "hidden": 0,
+            "is_query_report": 0,
+            "label": "Commission Engine",
+            "link_count": 0,
+            "onboard": 0,
+            "type": "Card Break"
+        },
+        {
+            "dependencies": "",
+            "hidden": 0,
+            "is_query_report": 0,
+            "label": "Commission Entry",
+            "link_count": 0,
+            "link_to": "Commission Entry",
+            "link_type": "DocType",
+            "onboard": 1,
+            "type": "Link"
+        },
+        {
+            "hidden": 0,
+            "is_query_report": 0,
+            "label": "Commission Reports",
+            "link_count": 0,
+            "onboard": 0,
+            "type": "Card Break"
+        },
+        {
+            "dependencies": "Commission Entry",
+            "hidden": 0,
+            "is_query_report": 1,
+            "label": "Commission Summary",
+            "link_count": 0,
+            "link_to": "Commission Summary",
+            "link_type": "Report",
+            "onboard": 1,
+            "type": "Link"
+        },
+        {
+            "hidden": 0,
+            "is_query_report": 0,
+            "label": "Commission Settings Card",
+            "link_count": 0,
+            "onboard": 0,
+            "type": "Card Break"
+        },
+        {
+            "dependencies": "",
+            "hidden": 0,
+            "is_query_report": 0,
+            "label": "Commission Settings",
+            "link_count": 0,
+            "link_to": "Commission Settings",
+            "link_type": "DocType",
+            "onboard": 1,
+            "type": "Link"
+        }
+    ],
+    "modified": "2026-03-26 00:00:00",
+    "modified_by": "Administrator",
+    "module": "Commission Engine",
+    "name": "Commission Engine",
+    "number_cards": [],
+    "owner": "Administrator",
+    "parent_page": "",
+    "public": 1,
+    "quick_lists": [],
+    "restrict_to_domain": "",
+    "roles": [],
+    "sequence_id": 99.0,
+    "shortcuts": [],
+    "title": "Commission Engine",
+    "type": "Workspace"
+}

@@ -201,8 +201,8 @@
     "links": [
         {
             "group": "Sales",
-            "link_doctype": "Sales Invoice",
-            "link_fieldname": "name"
+            "link_doctype": "Commission Entry",
+            "link_fieldname": "sales_invoice"
         }
     ],
     "modified": "2026-03-26 00:00:00",
