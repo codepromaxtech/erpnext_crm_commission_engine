@@ -200,9 +200,16 @@
     ],
     "links": [
         {
-            "group": "Sales",
+            "group": "Commission",
             "link_doctype": "Commission Entry",
             "link_fieldname": "sales_invoice"
+        },
+        {
+            "group": "Accounting",
+            "link_doctype": "Journal Entry",
+            "link_fieldname": "name",
+            "parent_doctype": "Commission Entry",
+            "table_fieldname": "journal_entry"
         }
     ],
     "modified": "2026-03-26 00:00:00",
