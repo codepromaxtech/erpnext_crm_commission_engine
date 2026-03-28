@@ -11,15 +11,14 @@ app_license = "mit"
 # required_apps = []
 
 # Each item in the list will be shown as an app in the apps page
-# add_to_apps_screen = [
-# 	{
-# 		"name": "commission_engine",
-# 		"logo": "/assets/commission_engine/logo.png",
-# 		"title": "Commission Engine",
-# 		"route": "/commission_engine",
-# 		"has_permission": "commission_engine.api.permission.has_app_permission"
-# 	}
-# ]
+add_to_apps_screen = [
+	{
+		"name": "commission_engine",
+		"logo": "/assets/commission_engine/commission_engine_logo.svg",
+		"title": "Commission Engine",
+		"route": "/app/commission-engine",
+	}
+]
 
 # Includes in <head>
 # ------------------

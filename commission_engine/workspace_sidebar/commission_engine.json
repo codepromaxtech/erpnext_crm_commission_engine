@@ -1,0 +1,76 @@
+{
+ "app": "commission_engine",
+ "creation": "2026-03-26 00:00:00",
+ "docstatus": 0,
+ "doctype": "Workspace Sidebar",
+ "for_user": "",
+ "header_icon": "accounting",
+ "idx": 0,
+ "items": [
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "home",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Home",
+   "link_to": "Commission Engine",
+   "link_type": "Workspace",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "file-text",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Commission Entry",
+   "link_to": "Commission Entry",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "table",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Reports",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Section Break"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "table",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Commission Summary",
+   "link_to": "Commission Summary",
+   "link_type": "Report",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "settings",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Settings",
+   "link_to": "Commission Settings",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-03-26 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Commission Engine",
+ "name": "Commission Engine",
+ "owner": "Administrator",
+ "title": "Commission Engine"
+}
