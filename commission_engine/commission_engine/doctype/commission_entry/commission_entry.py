@@ -39,16 +39,18 @@ class CommissionEntry(Document):
 		self.manager_commission_amount = flt(self.base_amount) * flt(self.manager_commission_pct) / 100
 
 	def on_update(self):
-		"""Auto-create journal entry when status is set to Paid and setting is enabled."""
-		settings = frappe.get_cached_doc("Commission Settings")
-		if (
-			self.status == "Paid"
-			and settings.auto_create_journal_entry
-			and not self.journal_entry
-			and settings.commission_expense_account
-			and settings.commission_payable_account
-		):
-			self._create_journal_entry(settings)
+		"""Auto-create journal entry and notify when status changes to Paid."""
+		if self.status == "Paid" and self.has_value_changed("status"):
+			settings = frappe.get_cached_doc("Commission Settings")
+			if (
+				settings.auto_create_journal_entry
+				and not self.journal_entry
+				and settings.commission_expense_account
+				and settings.commission_payable_account
+			):
+				self._create_journal_entry(settings)
+
+			self._send_paid_notification()
 
 	def _create_journal_entry(self, settings):
 		total_amount = flt(self.commission_amount) + flt(self.manager_commission_amount)
@@ -78,6 +80,73 @@ class CommissionEntry(Document):
 
 		self.db_set("journal_entry", je.name)
 		frappe.msgprint(_(f"Journal Entry {je.name} created for commission payment."), indicator="green")
+
+	def _send_paid_notification(self):
+		"""Send email notification to salesperson (and manager) when commission is paid."""
+		recipients = []
+
+		# Get salesperson's email from their linked Employee
+		sp_employee = frappe.db.get_value("Sales Person", self.sales_person, "employee")
+		if sp_employee:
+			sp_email = frappe.db.get_value("Employee", sp_employee, "prefered_email") or \
+					   frappe.db.get_value("Employee", sp_employee, "company_email") or \
+					   frappe.db.get_value("Employee", sp_employee, "personal_email")
+			if sp_email:
+				recipients.append(sp_email)
+
+		# Get manager's email
+		if self.manager:
+			mgr_employee = frappe.db.get_value("Sales Person", self.manager, "employee")
+			if mgr_employee:
+				mgr_email = frappe.db.get_value("Employee", mgr_employee, "prefered_email") or \
+							frappe.db.get_value("Employee", mgr_employee, "company_email") or \
+							frappe.db.get_value("Employee", mgr_employee, "personal_email")
+				if mgr_email:
+					recipients.append(mgr_email)
+
+		if not recipients:
+			return
+
+		total = flt(self.commission_amount) + flt(self.manager_commission_amount)
+		subject = _("Commission Paid — {0}").format(self.name)
+		message = _(
+			"<p>Hello,</p>"
+			"<p>A commission has been marked as <b>Paid</b>.</p>"
+			"<table style='border-collapse:collapse; width:100%; max-width:500px;'>"
+			"<tr><td style='padding:6px; border:1px solid #ddd;'><b>Commission Entry</b></td>"
+			"<td style='padding:6px; border:1px solid #ddd;'>{entry}</td></tr>"
+			"<tr><td style='padding:6px; border:1px solid #ddd;'><b>Sales Invoice</b></td>"
+			"<td style='padding:6px; border:1px solid #ddd;'>{invoice}</td></tr>"
+			"<tr><td style='padding:6px; border:1px solid #ddd;'><b>Customer</b></td>"
+			"<td style='padding:6px; border:1px solid #ddd;'>{customer}</td></tr>"
+			"<tr><td style='padding:6px; border:1px solid #ddd;'><b>Salesperson Commission</b></td>"
+			"<td style='padding:6px; border:1px solid #ddd;'>{sp_amt}</td></tr>"
+			"<tr><td style='padding:6px; border:1px solid #ddd;'><b>Manager Commission</b></td>"
+			"<td style='padding:6px; border:1px solid #ddd;'>{mgr_amt}</td></tr>"
+			"<tr style='background:#f0f4ff;'><td style='padding:6px; border:1px solid #ddd;'><b>Total</b></td>"
+			"<td style='padding:6px; border:1px solid #ddd;'><b>{total}</b></td></tr>"
+			"</table>"
+			"<p>Regards,<br>Commission Engine</p>"
+		).format(
+			entry=self.name,
+			invoice=self.sales_invoice,
+			customer=self.customer_name or self.customer,
+			sp_amt=frappe.utils.fmt_money(self.commission_amount),
+			mgr_amt=frappe.utils.fmt_money(self.manager_commission_amount),
+			total=frappe.utils.fmt_money(total),
+		)
+
+		try:
+			frappe.sendmail(
+				recipients=recipients,
+				subject=subject,
+				message=message,
+				reference_doctype="Commission Entry",
+				reference_name=self.name,
+				now=False,  # Queue the email
+			)
+		except Exception:
+			frappe.log_error("Commission Paid Notification Error")
 
 
 # ---------------------------------------------------------------------------

@@ -108,3 +108,23 @@ def _set_default_settings():
 	settings.auto_create_journal_entry = 1
 	settings.flags.ignore_permissions = True
 	settings.save()
+
+
+def on_new_company(doc, method=None):
+	"""Auto-create Commission Expense and Payable accounts for new companies."""
+	_ensure_account(
+		company=doc.name,
+		account_name="Commission Expense",
+		parent_account_type="Expense Account",
+		parent_name_pattern="Indirect Expenses",
+		root_type="Expense",
+		account_type="Expense Account",
+	)
+	_ensure_account(
+		company=doc.name,
+		account_name="Commission Payable",
+		parent_account_type="",
+		parent_name_pattern="Current Liabilities",
+		root_type="Liability",
+		account_type="Payable",
+	)

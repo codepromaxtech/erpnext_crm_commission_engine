@@ -33,7 +33,7 @@ frappe.listview_settings["Commission Entry"] = {
     },
 
     onload(listview) {
-        // Add quick filters
+        // Quick filters
         listview.page.add_inner_button(__("Pending"), () => {
             listview.filter_area.add([[listview.doctype, "status", "=", "Pending"]]);
         }, __("Quick Filter"));
@@ -49,6 +49,33 @@ frappe.listview_settings["Commission Entry"] = {
         listview.page.add_inner_button(__("Recurring"), () => {
             listview.filter_area.add([[listview.doctype, "commission_type", "=", "Recurring"]]);
         }, __("Quick Filter"));
+
+        // Bulk Mark as Paid action
+        listview.page.add_action_item(__("Mark as Paid"), () => {
+            const checked = listview.get_checked_items();
+            const pending = checked.filter(d => d.status === "Pending");
+
+            if (!pending.length) {
+                frappe.msgprint(__("Please select at least one Pending commission entry."));
+                return;
+            }
+
+            frappe.confirm(
+                __("Mark {0} commission entries as Paid?", [pending.length]),
+                () => {
+                    frappe.xcall(
+                        "commission_engine.api.bulk_mark_as_paid",
+                        { names: pending.map(d => d.name) }
+                    ).then(r => {
+                        frappe.show_alert({
+                            message: r.message,
+                            indicator: "green"
+                        });
+                        listview.refresh();
+                    });
+                }
+            );
+        });
     },
 
     button: {

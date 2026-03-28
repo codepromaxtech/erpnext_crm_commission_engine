@@ -135,7 +135,10 @@ doc_events = {
 	"Sales Invoice": {
 		"on_submit": "commission_engine.commission_engine.doctype.commission_entry.commission_entry.create_commission_entries",
 		"on_cancel": "commission_engine.commission_engine.doctype.commission_entry.commission_entry.cancel_commission_entries",
-	}
+	},
+	"Company": {
+		"after_insert": "commission_engine.install.on_new_company",
+	},
 }
 
 # Scheduled Tasks
