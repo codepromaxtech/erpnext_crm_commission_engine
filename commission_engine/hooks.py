@@ -140,7 +140,7 @@ doc_events = {
 		"after_insert": "commission_engine.install.on_new_company",
 	},
 	"Customer": {
-		"after_insert": "commission_engine.customer_hooks.auto_set_sales_person",
+		"before_insert": "commission_engine.customer_hooks.auto_set_sales_person",
 	},
 }
 

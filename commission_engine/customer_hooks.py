@@ -12,9 +12,12 @@ def auto_set_sales_person(doc, method=None):
 
 	This ensures subscription invoices and manual invoices for this customer
 	always have a tagged sales person for commission calculation.
+
+	Runs on Customer.before_insert so the sales_team is saved in a single
+	database operation (no double-save needed).
 	"""
-	# Only run if customer has no sales_team already and was created from a lead
-	if doc.get("sales_team"):
+	# Only run if customer has no sales_team already
+	if doc.get("sales_team") and len(doc.get("sales_team")) > 0:
 		return
 
 	lead_name = doc.get("lead_name")
@@ -31,21 +34,26 @@ def auto_set_sales_person(doc, method=None):
 	if not sales_person:
 		return
 
-	# Add to sales_team
+	# Get the default commission rate from Commission Settings
+	commission_pct = 0
+	try:
+		settings = frappe.get_cached_doc("Commission Settings")
+		commission_pct = flt(settings.onetime_salesperson_pct) or 0
+	except Exception:
+		pass
+
+	# Add to sales_team with proper commission rate
 	doc.append("sales_team", {
 		"sales_person": sales_person,
 		"allocated_percentage": 100,
 		"allocated_amount": 0,
+		"commission_rate": commission_pct,
 	})
-
-	# We need to save since this runs after insert
-	doc.flags.ignore_permissions = True
-	doc.save()
 
 	frappe.msgprint(
 		frappe._(
-			"Sales Person <b>{0}</b> auto-assigned from Lead Owner."
-		).format(sales_person),
+			"Sales Person <b>{0}</b> auto-assigned from Lead Owner <b>{1}</b> with {2}% commission."
+		).format(sales_person, lead_owner, commission_pct),
 		indicator="green",
 		alert=True,
 	)
@@ -55,17 +63,21 @@ def _resolve_sales_person(user_email):
 	"""
 	Resolve a User email to a Sales Person via:
 	1. User → Employee (user_id field) → Sales Person (employee field)
-	2. Or direct Sales Person name match
+	2. Employee name → Sales Person name match
+	3. User full name → Sales Person name match
 	"""
 	# Method 1: User → Employee → Sales Person
-	employee = frappe.db.get_value("Employee", {"user_id": user_email, "status": "Active"}, "name")
+	employee = frappe.db.get_value(
+		"Employee", {"user_id": user_email, "status": "Active"}, "name"
+	)
 	if employee:
-		sales_person = frappe.db.get_value("Sales Person", {"employee": employee, "enabled": 1}, "name")
+		sales_person = frappe.db.get_value(
+			"Sales Person", {"employee": employee, "enabled": 1}, "name"
+		)
 		if sales_person:
 			return sales_person
 
-	# Method 2: Try matching by employee name
-	if employee:
+		# Method 2: Try matching by employee name
 		employee_name = frappe.db.get_value("Employee", employee, "employee_name")
 		if employee_name:
 			sales_person = frappe.db.get_value(

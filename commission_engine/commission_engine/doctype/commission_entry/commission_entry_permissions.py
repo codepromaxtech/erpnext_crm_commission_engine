@@ -41,14 +41,14 @@ def get_permission_query_conditions(user=None):
 			descendants = _get_descendants(sp)
 			all_persons.update(descendants)
 
-		persons_str = ", ".join(f"'{frappe.db.escape(p)}'" for p in all_persons)
+		persons_str = ", ".join(frappe.db.escape(p) for p in all_persons)
 		return (
 			f"(`tabCommission Entry`.sales_person IN ({persons_str}) "
 			f"OR `tabCommission Entry`.manager IN ({persons_str}))"
 		)
 
 	# Sales User — only their own commissions
-	persons_str = ", ".join(f"'{frappe.db.escape(p)}'" for p in sales_persons)
+	persons_str = ", ".join(frappe.db.escape(p) for p in sales_persons)
 	return f"`tabCommission Entry`.sales_person IN ({persons_str})"
 
 
