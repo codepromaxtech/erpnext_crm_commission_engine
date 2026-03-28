@@ -2,58 +2,62 @@
 
 **Automated multi-level sales commission calculation for ERPNext v16**
 
-Commission Engine automatically calculates salesperson and manager commissions when Sales Invoices are submitted. It supports first-invoice (one-time) and recurring commission rates, individual rate overrides, automated journal entries, and email notifications.
+Commission Engine automatically calculates salesperson and manager commissions when Sales Invoices are submitted. It supports first-invoice (one-time) and recurring commission rates, individual rate overrides, automated journal entries, email notifications, and role-based access control.
 
 ---
 
-## How It Works
+## Full Operation Flow
 
 ```mermaid
 flowchart TD
-    A["🎯 New Lead\n(CRM)"] --> B["💼 Opportunity\n(Qualified Lead)"]
+    A["🎯 New Lead\n(Assign Lead Owner)"] --> B["💼 Opportunity\n(Qualified Lead)"]
     B --> C["📋 Quotation\n(Price Proposal)"]
     C --> D["📦 Sales Order\n(Confirmed Deal)"]
-    D --> E["🧾 Sales Invoice\n(Bill the Customer)"]
+    A -->|"Direct Convert"| E["👤 Customer Created\n(Sales Person auto-tagged\nfrom Lead Owner)"]
+    D --> F["🧾 Sales Invoice\n(Bill the Customer)"]
+    E --> F
 
-    E -->|"on_submit hook"| F{"First Invoice\nfor this Customer?"}
+    F -->|"on_submit hook"| G{"First Invoice\nfor this Customer?"}
 
-    F -->|"Yes"| G["📊 Commission Entry\n(One-Time Rates)"]
-    F -->|"No"| H["📊 Commission Entry\n(Recurring Rates)"]
+    G -->|"Yes"| H["📊 Commission Entry\n(One-Time Rates)"]
+    G -->|"No"| I["📊 Commission Entry\n(Recurring Rates)"]
 
-    G --> I{"Individual Override\nfor this person?"}
-    H --> I
+    H --> J{"Individual Override\nfor this person?"}
+    I --> J
 
-    I -->|"Yes"| J["Use Override Rate"]
-    I -->|"No"| K["Use Global Default Rate"]
+    J -->|"Yes"| K["Use Override Rate"]
+    J -->|"No"| L["Use Global Default Rate"]
 
-    J --> L["💰 Commission Calculated\n(SP + Manager amounts)"]
-    K --> L
+    K --> M["💰 Commission Calculated\n(Salesperson + Manager)"]
+    L --> M
 
-    L --> M["📬 Status: Pending"]
-    M -->|"Mark as Paid"| N["✅ Status: Paid"]
-    N --> O["📝 Journal Entry\n(Auto-Created)"]
-    N --> P["📧 Email Notification\n(Salesperson + Manager)"]
+    M --> N["📬 Status: Pending"]
+    N -->|"Mark as Paid\n(single or bulk)"| O["✅ Status: Paid"]
+    O --> P["📝 Journal Entry\n(Auto-Created)"]
+    O --> Q["📧 Email Notification\n(Salesperson + Manager)"]
 
     style A fill:#e8f5e9,stroke:#4caf50,color:#000
-    style E fill:#e3f2fd,stroke:#2196f3,color:#000
-    style G fill:#fff3e0,stroke:#ff9800,color:#000
+    style E fill:#e0f7fa,stroke:#00bcd4,color:#000
+    style F fill:#e3f2fd,stroke:#2196f3,color:#000
     style H fill:#fff3e0,stroke:#ff9800,color:#000
-    style L fill:#f3e5f5,stroke:#9c27b0,color:#000
-    style N fill:#e8f5e9,stroke:#4caf50,color:#000
-    style O fill:#fce4ec,stroke:#e91e63,color:#000
-    style P fill:#e0f7fa,stroke:#00bcd4,color:#000
+    style I fill:#fff3e0,stroke:#ff9800,color:#000
+    style M fill:#f3e5f5,stroke:#9c27b0,color:#000
+    style O fill:#e8f5e9,stroke:#4caf50,color:#000
+    style P fill:#fce4ec,stroke:#e91e63,color:#000
+    style Q fill:#e0f7fa,stroke:#00bcd4,color:#000
 ```
 
-### Commission Flow Summary
+### Flow Summary
 
 | Stage | What Happens |
 |-------|-------------|
-| **Lead → Customer** | Sales Person is assigned during the CRM process |
+| **Lead Created** | Assign a Lead Owner (user who manages this lead) |
+| **Lead → Customer** | Sales Person auto-tagged from Lead Owner (User → Employee → Sales Person) |
 | **Sales Invoice Submitted** | Commission Entry auto-created via `on_submit` hook |
-| **First Invoice?** | System checks if this customer had prior invoices |
-| **Rate Selection** | Individual override → or → Global default rate |
-| **Commission Calculated** | Salesperson % + Manager % applied to invoice amount |
-| **Mark as Paid** | Journal Entry auto-created + Email notification sent |
+| **First Invoice?** | System checks if this customer had any prior submitted invoices |
+| **Rate Selection** | Individual override checked first → falls back to global default |
+| **Commission Calculated** | Salesperson % + Manager % applied to the allocated invoice amount |
+| **Mark as Paid** | Journal Entry auto-created + Email sent to salesperson & manager |
 
 ---
 
@@ -71,153 +75,262 @@ bench build --app commission_engine
 sudo supervisorctl restart all
 ```
 
-On install, the app automatically:
-- Creates **Commission Expense** and **Commission Payable** accounts
-- Enables **Auto-Create Journal Entry on Payment**
-- Sets default commission rates (10% SP / 2% Manager for first invoice, 5% SP / 1% Manager for recurring)
+**On install, the app automatically:**
+- Creates **Commission Expense** and **Commission Payable** accounts for all companies
+- Links the accounts in Commission Settings
+- Enables **Auto-Create Journal Entry on Payment** by default
 
 ---
 
 ## User Guide
 
-### Step 1: Register a Lead
+### Step 1: Set Up Sales Person Hierarchy
 
-1. Go to **CRM → Lead → + Add Lead**
-2. Fill in the lead's details (name, email, company, etc.)
-3. **Assign a Sales Person** — this person will earn commissions later
+Before anything else, set up your sales team structure:
 
-### Step 2: Convert Lead to Customer
+1. Go to **Selling → Sales Person**
+2. Build your tree hierarchy:
 
-1. Open the Lead → Click **Create → Customer**
-2. The Lead converts to a **Customer** with the CRM history preserved
-3. The Sales Person from the lead carries forward
+```
+All Sales Persons
+├── Regional Manager A          ← earns manager commission
+│   ├── Salesperson 1           ← earns salesperson commission
+│   ├── Salesperson 2
+│   └── Salesperson 3
+├── Regional Manager B
+│   ├── Salesperson 4
+│   └── Salesperson 5
+```
 
-> **Tip:** You can also go through the full pipeline:
-> Lead → **Opportunity** → **Quotation** → **Sales Order** → **Sales Invoice**
-> The Sales Person is carried through each step automatically.
+3. For each Sales Person, link an **Employee** (which must have a **User ID** set)
+4. This linkage enables:
+   - Auto-tagging when converting leads
+   - Role-based access control
+   - Email notifications
 
-### Step 3: Create a Sales Invoice
-
-1. Go to **Accounting → Sales Invoice → + Add Sales Invoice**
-2. Select the **Customer**
-3. Add your items
-4. **Important:** Check the **Sales Team** section at the bottom — make sure a Sales Person is listed with their contribution %
-
-> ⚠️ If no Sales Person is tagged, a **warning banner** will appear and a confirmation dialog will show when you try to submit.
-
-5. **Submit** the invoice
-
-### Step 4: Commission Entry (Auto-Created)
-
-When you submit the invoice, the system automatically:
-
-1. Detects if this is the **first invoice** for this customer → applies **One-Time rates**
-2. Or if it's a **subsequent invoice** → applies **Recurring rates**
-3. Looks up the salesperson's **manager** via the Sales Person tree hierarchy
-4. Checks for **individual rate overrides** in Commission Settings
-5. Creates a **Commission Entry** with calculated amounts
-
-You can view the commission entry:
-- From the Sales Invoice → **Connections sidebar** → Commission section
-- Or go to **Commission Engine → Commission Entry** list
-
-### Step 5: Pay the Commission
-
-1. Open the **Commission Entry**
-2. Click **Actions → Mark as Paid**
-3. The system will:
-   - Auto-create a **Journal Entry** (debit Commission Expense, credit Commission Payable)
-   - Send an **email notification** to the salesperson and their manager
-
-**Bulk payment:** In the Commission Entry list, select multiple pending entries → **Menu → Mark as Paid** to process them all at once.
-
-### Step 6: View the Commission Report
-
-1. Go to **Commission Engine → Commission Summary** report
-2. Use filters:
-   - **Date range** — filter by commission month
-   - **Sales Person** — view one person's commissions
-   - **Manager** — view all commissions under a manager
-   - **Status** — Pending / Paid
-   - **Type** — One-Time / Recurring
-   - **Company** — for multi-company setups
-3. The report shows:
-   - A **bar chart** of top salesperson commissions
-   - **Summary cards** with total SP commission, Manager commission, Grand total, and Pending payable
-
----
-
-## Configuration
-
-### Global Default Rates
+### Step 2: Configure Commission Rates
 
 Go to **Commission Engine → Commission Settings**:
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| First Invoice - Salesperson % | 10% | Commission for the first invoice to a new customer |
-| First Invoice - Manager % | 2% | Manager override commission on first invoices |
-| Recurring - Salesperson % | 5% | Commission on all subsequent invoices |
-| Recurring - Manager % | 1% | Manager override on recurring invoices |
+#### Global Default Rates
 
-### Individual Rate Overrides
+These apply to everyone unless overridden:
 
-In **Commission Settings → Individual Rate Overrides** table:
+| Setting | Description |
+|---------|-------------|
+| First Invoice - Salesperson % | Commission on the first invoice to a new customer |
+| First Invoice - Manager % | Manager's override commission on first invoices |
+| Recurring - Salesperson % | Commission on all subsequent invoices |
+| Recurring - Manager % | Manager's override on recurring invoices |
+
+#### Individual Rate Overrides
+
+For specific people who need different rates:
 
 | Field | Description |
 |-------|-------------|
 | Sales Person | The person getting a custom rate |
-| Role | Salesperson or Manager |
-| First Invoice % | Override for first invoices (blank = use global default) |
-| Recurring % | Override for recurring invoices (blank = use global default) |
+| Role | `Salesperson` or `Manager` |
+| First Invoice % | Override for first invoices (leave blank = use global) |
+| Recurring % | Override for recurring invoices (leave blank = use global) |
 
-**Example:** All managers get 2% by default, but Manager C gets 5.5%:
-- Add a row: Sales Person = `Manager C`, Role = `Manager`, First Invoice = `5.5`, Recurring = `2.5`
+**Example:** All managers get 5% globally, but Manager C gets 5.5%:
+- Add a row: `Sales Person = Manager C`, `Role = Manager`, `Recurring = 5.5`
 
-### Accounting
+#### Accounting Settings
 
 | Setting | Description |
 |---------|-------------|
-| Commission Expense Account | Debit account for journal entries (auto-created on install) |
-| Commission Payable Account | Credit account for journal entries (auto-created on install) |
-| Auto-Create Journal Entry | When ON, marking a commission as Paid auto-creates a JE |
+| Commission Expense Account | Debit account (auto-created on install) |
+| Commission Payable Account | Credit account (auto-created on install) |
+| Auto-Create Journal Entry | ON by default — auto-creates JE when commission is marked Paid |
+
+### Step 3: Register a Lead
+
+1. Go to **CRM → Lead → + Add Lead**
+2. Fill in the lead's details (name, email, company, etc.)
+3. **Set the Lead Owner** — this is the user who manages this lead and will earn commission
+
+> **Important:** The Lead Owner must be linked to an Employee, and that Employee must be linked to a Sales Person in the tree.
+
+### Step 4: Convert Lead to Customer
+
+1. Open the Lead → Click **Create → Customer**
+2. The system auto-detects the Lead Owner and resolves their Sales Person
+3. The **Sales Person is automatically added** to the Customer's Sales Team (100% allocation)
+4. A green alert confirms: *"Sales Person X auto-assigned from Lead Owner"*
+
+> You can also go through the full CRM pipeline: Lead → Opportunity → Quotation → Sales Order → Sales Invoice. The Sales Person carries through each step.
+
+### Step 5: Create a Sales Invoice
+
+1. Go to **Accounting → Sales Invoice → + Add Sales Invoice**
+2. Select the **Customer** (Sales Team auto-populated from customer defaults)
+3. Add your line items
+4. Check the **Sales Team** section — verify a Sales Person is listed
+
+> ⚠️ **Warning:** If no Sales Person is tagged:
+> - An **orange warning banner** appears on the form
+> - A **confirmation dialog** shows when you try to submit
+> - You can still submit, but no commission will be created
+
+5. **Submit** the Sales Invoice
+
+### Step 6: Commission Entry (Auto-Created)
+
+When the invoice is submitted, the system automatically:
+
+1. Detects if this is the **first invoice** for this customer → **One-Time** rates
+2. Or a **subsequent invoice** → **Recurring** rates
+3. Resolves the **manager** from the Sales Person tree hierarchy
+4. Checks for **individual rate overrides** → falls back to global defaults
+5. Creates a **Commission Entry** with calculated amounts
+
+**Where to find it:**
+- Sales Invoice form → sidebar → **Commission** section
+- Or go to **Commission Engine → Commission Entry** list
+
+### Step 7: Pay the Commission
+
+**Single payment:**
+1. Open the Commission Entry → **Actions → Mark as Paid**
+2. Journal Entry auto-created + Email notification sent
+
+**Bulk payment:**
+1. Go to Commission Entry list
+2. Select multiple Pending entries (checkboxes)
+3. Click **Menu → Mark as Paid**
+4. All selected entries processed at once
+
+### Step 8: View Commission Report
+
+1. Go to **Commission Engine → Commission Summary**
+2. Available filters:
+   - **Date range** — by commission month
+   - **Sales Person** — individual's commissions
+   - **Manager** — all commissions under a manager
+   - **Status** — Pending / Paid
+   - **Type** — One-Time / Recurring
+   - **Company** — for multi-company setups
+3. The report includes:
+   - **Bar chart** — Top salesperson commissions
+   - **Summary cards** — Total SP, Manager, Grand Total, and Pending payable
 
 ---
 
-## Sales Person Hierarchy
+## Subscription / Recurring Invoices
 
-Commission Engine uses ERPNext's built-in **Sales Person** tree for manager resolution:
+For customers with ERPNext Subscriptions (monthly recurring billing):
 
-```
-All Sales Persons
-├── Regional Manager A          ← Manager (earns manager commission)
-│   ├── Sales Person 1          ← Salesperson (earns SP commission)
-│   ├── Sales Person 2
-│   └── Sales Person 3
-├── Regional Manager B
-│   ├── Sales Person 4
-│   └── Sales Person 5
-```
+1. Make sure the **Customer** has a Sales Person set in their **Sales Team** table
+2. When a Subscription generates a Sales Invoice and auto-submits it:
+   - The `sales_team` is inherited from the Customer
+   - Our `on_submit` hook fires → Commission Entry auto-created
+   - First subscription invoice = "One-Time" rates
+   - All subsequent = "Recurring" rates
 
-- Each salesperson's **parent** in the tree is their manager
-- The manager automatically earns a commission on every invoice their team members close
-- The tree root ("All Sales Persons") is excluded as a manager
+> **Tip:** If you set up the Lead → Customer conversion with the Lead Owner assigned, the Sales Person is auto-tagged and all future subscription invoices will generate commissions automatically.
 
 ---
 
-## Features
+## Role-Based Access Control
 
-- ✅ **Automatic commission calculation** on Sales Invoice submission
-- ✅ **First-invoice vs Recurring** rate detection per customer
-- ✅ **Manager commissions** via Sales Person hierarchy
-- ✅ **Individual rate overrides** per person
-- ✅ **Auto Journal Entry** creation on payment
-- ✅ **Email notifications** to salesperson and manager
-- ✅ **Bulk Mark as Paid** from list view
-- ✅ **Commission Summary Report** with charts and filters
-- ✅ **Sales Invoice integration** — warning banners and commission table
-- ✅ **Multi-company support** — auto-creates accounts for new companies
-- ✅ **CRM pipeline support** — sales person carries through Lead → Invoice
+Commission entries are filtered based on the logged-in user's role:
+
+| Role | What They See |
+|------|--------------|
+| **Sales User** | Only their own commissions (where they are the salesperson) |
+| **Sales Manager** | Their own + their team members' commissions (all descendants in the Sales Person tree) |
+| **Accounts User / Accounts Manager** | All commissions across the company |
+| **System Manager / Administrator** | All commissions |
+
+### How It Works
+
+```
+User logs in
+  → System resolves: User → Employee → Sales Person
+  → Applies appropriate filter based on role
+
+Sales User (e.g., Salesperson 3):
+  Sees: Only commissions where sales_person = "Salesperson 3"
+
+Sales Manager (e.g., Regional Manager A):
+  Sees: Commissions where sales_person or manager is themselves
+        OR any of their descendants (Salesperson 1, 2, 3)
+
+Admin / Accounts:
+  Sees: Everything
+```
+
+### Requirements for Access Control
+
+Each user in the system must be properly linked:
+
+```
+User (email/login) → Employee (user_id field) → Sales Person (employee field)
+```
+
+Without this linkage, the user won't see any commission entries.
+
+---
+
+## Auto-Created Accounting Accounts
+
+When the app is installed (or a new Company is created), the following accounts are auto-created:
+
+| Account | Type | Parent |
+|---------|------|--------|
+| Commission Expense - [ABBR] | Expense Account | Indirect Expenses |
+| Commission Payable - [ABBR] | Payable | Current Liabilities |
+
+These are automatically linked in Commission Settings for the default company.
+
+---
+
+## Email Notifications
+
+When a commission is marked as **Paid**, the system automatically emails:
+- The **Salesperson** — with their commission amount
+- The **Manager** — with their manager commission amount
+
+The email contains a formatted table with:
+- Commission Entry reference
+- Sales Invoice reference
+- Customer name
+- Salesperson & Manager commission amounts
+- Total commission
+
+> The email address is resolved from: Sales Person → Employee → Preferred Email / Company Email / Personal Email
+
+---
+
+## Sales Invoice Integration
+
+On every Sales Invoice form, the Commission Engine adds:
+
+- **Warning banner** (draft) — if no Sales Person is in the Sales Team
+- **Submit confirmation** — asks for confirmation if submitting without a sales person
+- **Commission table** (submitted) — shows all linked Commission Entries with amounts, type, and status badges
+- **Sidebar connections** — Commission Entries appear in the Sales Invoice's sidebar under "Commission"
+
+---
+
+## Features Summary
+
+- ✅ Automatic commission calculation on Sales Invoice submission
+- ✅ First-invoice vs Recurring rate detection per customer
+- ✅ Manager commissions via Sales Person tree hierarchy
+- ✅ Individual rate overrides per person per role
+- ✅ Auto Journal Entry creation on payment
+- ✅ Email notifications to salesperson and manager on payment
+- ✅ Bulk Mark as Paid from list view
+- ✅ Commission Summary report with charts and summary cards
+- ✅ Sales Invoice integration (warning banners + commission table)
+- ✅ Auto Sales Person tagging on Lead → Customer conversion
+- ✅ Multi-company support (auto-creates accounts for new companies)
+- ✅ Subscription/recurring invoice support
+- ✅ Role-based access control (Sales User / Manager / Admin)
+- ✅ Rich dashboard UI with stat cards and status indicators
 
 ---
 
