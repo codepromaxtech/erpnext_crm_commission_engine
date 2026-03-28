@@ -5,6 +5,38 @@ import frappe
 from frappe.utils import flt
 
 
+@frappe.whitelist()
+def resolve_sales_person_from_lead(lead_name):
+	"""
+	Whitelisted API: Given a Lead name, resolve the Lead Owner to a Sales Person
+	and return the sales person name with commission rate for the Customer form.
+	"""
+	if not lead_name:
+		return None
+
+	lead_owner = frappe.db.get_value("Lead", lead_name, "lead_owner")
+	if not lead_owner:
+		return None
+
+	sales_person = _resolve_sales_person(lead_owner)
+	if not sales_person:
+		return None
+
+	# Get commission rate from settings
+	commission_pct = 0
+	try:
+		settings = frappe.get_cached_doc("Commission Settings")
+		commission_pct = flt(settings.onetime_salesperson_pct) or 0
+	except Exception:
+		pass
+
+	return {
+		"sales_person": sales_person,
+		"commission_rate": commission_pct,
+		"lead_owner": lead_owner,
+	}
+
+
 def auto_set_sales_person(doc, method=None):
 	"""
 	When a Customer is created from a Lead, auto-populate the sales_team
