@@ -106,13 +106,16 @@ def create_commission_entries(doc, method=None):
 		is_first = _is_first_invoice(doc.customer, doc.name)
 		commission_type = "One-Time" if is_first else "Recurring"
 
-		# Pick rates from settings
+		# Pick global default rates from settings
 		if is_first:
 			sp_pct = flt(settings.onetime_salesperson_pct)
 			mgr_pct = flt(settings.onetime_manager_pct)
 		else:
 			sp_pct = flt(settings.recurring_salesperson_pct)
 			mgr_pct = flt(settings.recurring_manager_pct)
+
+		# Check for individual override for this salesperson
+		sp_pct = _get_override_rate(settings, row.sales_person, "Salesperson", is_first, sp_pct)
 
 		# Base amount = the allocated amount for this sales person on the invoice
 		base_amount = flt(row.allocated_amount) or flt(doc.base_net_total)
@@ -128,6 +131,10 @@ def create_commission_entries(doc, method=None):
 			)
 			if manager == root:
 				manager = None
+
+		# Check for individual override for this manager
+		if manager:
+			mgr_pct = _get_override_rate(settings, manager, "Manager", is_first, mgr_pct)
 
 		# Check if a Commission Entry already exists for this invoice + salesperson
 		existing = frappe.db.exists("Commission Entry", {
@@ -194,3 +201,29 @@ def _is_first_invoice(customer, current_invoice_name):
 		},
 	)
 	return count == 0
+
+
+def _get_override_rate(settings, sales_person, role, is_first, default_pct):
+	"""
+	Look up the Commission Rate Override child table for a per-person rate.
+	Returns the override rate if found (and non-zero), else the global default.
+
+	Args:
+		settings: Commission Settings doc (cached)
+		sales_person: Name of the Sales Person to look up
+		role: "Salesperson" or "Manager"
+		is_first: True if this is a first-invoice commission
+		default_pct: The global default percentage to fall back to
+	"""
+	overrides = settings.get("commission_rate_overrides") or []
+	for row in overrides:
+		if row.sales_person == sales_person and row.role == role:
+			if is_first:
+				rate = flt(row.onetime_commission_pct)
+			else:
+				rate = flt(row.recurring_commission_pct)
+			# Only override if a value was explicitly set (non-zero)
+			if rate:
+				return rate
+			break  # Found the person but rate is 0/blank, use default
+	return default_pct

@@ -13,6 +13,8 @@
         "recurring_salesperson_pct",
         "recurring_manager_pct",
         "col_break2",
+        "override_section",
+        "commission_rate_overrides",
         "accounting_section",
         "commission_expense_account",
         "commission_payable_account",
@@ -23,13 +25,13 @@
             "fieldname": "first_invoice_section",
             "fieldtype": "Section Break",
             "label": "First Invoice (One-Time) Commission Rates",
-            "description": "Rates applied when a salesperson bills a customer for the FIRST time"
+            "description": "Default rates for the FIRST invoice to a customer. Can be overridden per person below."
         },
         {
             "default": "10",
             "fieldname": "onetime_salesperson_pct",
             "fieldtype": "Percent",
-            "label": "Salesperson Commission %",
+            "label": "Default Salesperson Commission %",
             "description": "E.g. 10 means 10% of invoice net amount",
             "reqd": 1
         },
@@ -37,7 +39,7 @@
             "default": "2",
             "fieldname": "onetime_manager_pct",
             "fieldtype": "Percent",
-            "label": "Manager Commission %",
+            "label": "Default Manager Commission %",
             "description": "E.g. 2 means 2% of invoice net amount",
             "reqd": 1
         },
@@ -49,13 +51,13 @@
             "fieldname": "recurring_section",
             "fieldtype": "Section Break",
             "label": "Recurring Invoice Commission Rates",
-            "description": "Rates applied for all subsequent (recurring/subscription) invoices"
+            "description": "Default rates for all subsequent invoices. Can be overridden per person below."
         },
         {
             "default": "5",
             "fieldname": "recurring_salesperson_pct",
             "fieldtype": "Percent",
-            "label": "Salesperson Commission %",
+            "label": "Default Salesperson Commission %",
             "description": "E.g. 5 means 5% of invoice net amount",
             "reqd": 1
         },
@@ -63,7 +65,7 @@
             "default": "1",
             "fieldname": "recurring_manager_pct",
             "fieldtype": "Percent",
-            "label": "Manager Commission %",
+            "label": "Default Manager Commission %",
             "description": "E.g. 1 means 1% of invoice net amount",
             "reqd": 1
         },
@@ -72,9 +74,22 @@
             "fieldtype": "Column Break"
         },
         {
+            "fieldname": "override_section",
+            "fieldtype": "Section Break",
+            "label": "Individual Rate Overrides",
+            "description": "Override commission rates for specific salespersons or managers. Leave blank to use the global defaults above."
+        },
+        {
+            "fieldname": "commission_rate_overrides",
+            "fieldtype": "Table",
+            "label": "Rate Overrides",
+            "options": "Commission Rate Override",
+            "description": "Add rows here only for people who need a different rate than the defaults above"
+        },
+        {
             "fieldname": "accounting_section",
             "fieldtype": "Section Break",
-            "label": "Accounting (Optional)"
+            "label": "Accounting"
         },
         {
             "fieldname": "commission_expense_account",
@@ -91,7 +106,7 @@
             "description": "Credit account for journal entries"
         },
         {
-            "default": "0",
+            "default": "1",
             "fieldname": "auto_create_journal_entry",
             "fieldtype": "Check",
             "label": "Auto-Create Journal Entry on Payment"
@@ -99,7 +114,7 @@
     ],
     "issingle": 1,
     "links": [],
-    "modified": "2026-03-26 00:00:00",
+    "modified": "2026-03-28 00:00:00",
     "modified_by": "Administrator",
     "module": "Commission Engine",
     "name": "Commission Settings",

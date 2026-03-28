@@ -85,7 +85,7 @@ add_to_apps_screen = [
 # ------------
 
 # before_install = "commission_engine.install.before_install"
-# after_install = "commission_engine.install.after_install"
+after_install = "commission_engine.install.after_install"
 
 # Uninstallation
 # ------------
