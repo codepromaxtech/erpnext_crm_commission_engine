@@ -22,17 +22,33 @@ def resolve_sales_person_from_lead(lead_name):
 	if not sales_person:
 		return None
 
-	# Get commission rate from settings
-	commission_pct = 0
+	# Get commission rates from settings
+	sp_pct = 0
+	mgr_pct = 0
 	try:
 		settings = frappe.get_cached_doc("Commission Settings")
-		commission_pct = flt(settings.onetime_salesperson_pct) or 0
+		sp_pct = flt(settings.onetime_salesperson_pct) or 0
+		mgr_pct = flt(settings.onetime_manager_pct) or 0
 	except Exception:
 		pass
 
+	# Resolve manager from Sales Person tree (parent node)
+	manager = None
+	manager_name = None
+	lft, rgt, parent_sp = frappe.db.get_value(
+		"Sales Person", sales_person, ["lft", "rgt", "parent_sales_person"]
+	) or (0, 0, None)
+
+	if parent_sp and parent_sp not in ("All Sales Persons", ""):
+		manager = parent_sp
+		manager_name = frappe.db.get_value("Sales Person", manager, "sales_person_name")
+
 	return {
 		"sales_person": sales_person,
-		"commission_rate": commission_pct,
+		"commission_rate": sp_pct,
+		"manager": manager,
+		"manager_name": manager_name,
+		"manager_commission_rate": mgr_pct,
 		"lead_owner": lead_owner,
 	}
 
