@@ -119,11 +119,8 @@ frappe.listview_settings["Commission Entry"] = {
             return __("Approve {0}", [doc.name]);
         },
         action(doc) {
-            frappe.xcall("frappe.client.set_value", {
-                doctype: "Commission Entry",
-                name: doc.name,
-                fieldname: "status",
-                value: "Approved"
+            frappe.xcall("commission_engine.api.bulk_approve", {
+                names: [doc.name]
             }).then(() => {
                 frappe.show_alert({ message: __("Approved ✓"), indicator: "blue" });
                 cur_list.refresh();

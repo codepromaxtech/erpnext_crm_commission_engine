@@ -51,21 +51,22 @@ frappe.ui.form.on("Sales Invoice", {
                     doctype: "Commission Entry",
                     filters: { sales_invoice: frm.doc.name, status: ["!=", "Cancelled"] },
                     fields: ["name", "sales_person", "sales_person_name", "commission_amount",
-                        "manager", "manager_name", "manager_commission_amount", "status", "commission_type"],
+                        "commission_role", "status", "commission_type", "commission_pct"],
                     limit_page_length: 20
                 }).then(entries => {
-                    let total_sp = 0, total_mgr = 0;
+                    let grand_total = 0;
                     let rows = "";
                     const currency = frappe.boot.sysdefaults.currency || "USD";
 
                     entries.forEach(e => {
-                        const sp_amt = flt(e.commission_amount);
-                        const mgr_amt = flt(e.manager_commission_amount);
-                        total_sp += sp_amt;
-                        total_mgr += mgr_amt;
+                        const amt = flt(e.commission_amount);
+                        grand_total += amt;
 
                         const status_color = e.status === "Paid" ? "#36b37e" :
-                            e.status === "Pending" ? "#f5a623" : "#de3618";
+                            e.status === "Approved" ? "#2196f3" :
+                                e.status === "Pending" ? "#f5a623" :
+                                    e.status === "Reversed" ? "#9c27b0" : "#de3618";
+                        const role_color = e.commission_role === "Manager" ? "#f5a623" : "#5e64ff";
                         const type_color = e.commission_type === "One-Time" ? "#5e64ff" : "#29cd42";
 
                         rows += `
@@ -77,10 +78,14 @@ frappe.ui.form.on("Sales Invoice", {
                                 ${e.sales_person_name || e.sales_person}
                             </td>
                             <td style="padding:6px 10px; border-bottom:1px solid #f0f0f0;">
-                                ${e.manager_name || e.manager || "—"}
+                                <span style="background:${role_color}; color:#fff; padding:2px 8px;
+                                    border-radius:10px; font-size:10px; font-weight:600;">${e.commission_role || "Salesperson"}</span>
+                            </td>
+                            <td style="padding:6px 10px; border-bottom:1px solid #f0f0f0; text-align:right;">
+                                ${flt(e.commission_pct, 2)}%
                             </td>
                             <td style="padding:6px 10px; border-bottom:1px solid #f0f0f0; text-align:right; font-weight:600;">
-                                ${format_currency(sp_amt + mgr_amt, currency)}
+                                ${format_currency(amt, currency)}
                             </td>
                             <td style="padding:6px 10px; border-bottom:1px solid #f0f0f0;">
                                 <span style="background:${type_color}; color:#fff; padding:2px 8px;
@@ -92,8 +97,6 @@ frappe.ui.form.on("Sales Invoice", {
                             </td>
                         </tr>`;
                     });
-
-                    const grand_total = total_sp + total_mgr;
 
                     const html = `
                     <div class="commission-invoice-summary" style="margin:12px 0;">
@@ -111,8 +114,9 @@ frappe.ui.form.on("Sales Invoice", {
                             <thead>
                                 <tr style="background:#f8f9fc;">
                                     <th style="padding:8px 10px; text-align:left; font-weight:600; color:#6b7280;">Entry</th>
-                                    <th style="padding:8px 10px; text-align:left; font-weight:600; color:#6b7280;">Salesperson</th>
-                                    <th style="padding:8px 10px; text-align:left; font-weight:600; color:#6b7280;">Manager</th>
+                                    <th style="padding:8px 10px; text-align:left; font-weight:600; color:#6b7280;">Person</th>
+                                    <th style="padding:8px 10px; text-align:left; font-weight:600; color:#6b7280;">Role</th>
+                                    <th style="padding:8px 10px; text-align:right; font-weight:600; color:#6b7280;">Rate</th>
                                     <th style="padding:8px 10px; text-align:right; font-weight:600; color:#6b7280;">Commission</th>
                                     <th style="padding:8px 10px; text-align:left; font-weight:600; color:#6b7280;">Type</th>
                                     <th style="padding:8px 10px; text-align:left; font-weight:600; color:#6b7280;">Status</th>

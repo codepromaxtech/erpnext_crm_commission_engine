@@ -19,6 +19,12 @@
             "role": "System Manager"
         },
         {
+            "role": "Accounts Manager"
+        },
+        {
+            "role": "Accounts User"
+        },
+        {
             "role": "Sales Manager"
         },
         {

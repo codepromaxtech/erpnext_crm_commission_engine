@@ -17,6 +17,10 @@ class CommissionSettings(Document):
 		commission_expense_account: DF.Link | None
 		commission_payable_account: DF.Link | None
 		commission_rate_overrides: DF.Table[CommissionRateOverride]
+		enable_approval_workflow: DF.Check
+		enable_tiered_commission: DF.Check
+		maximum_commission_cap: DF.Currency
+		minimum_commission_threshold: DF.Currency
 		onetime_manager_pct: DF.Percent
 		onetime_salesperson_pct: DF.Percent
 		recurring_manager_pct: DF.Percent
