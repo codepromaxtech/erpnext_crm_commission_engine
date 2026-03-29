@@ -3,8 +3,8 @@ name = "commission_engine"
 authors = [
     { name = "CodeProMax Tech", email = "codepromaxtech@gmail.com"}
 ]
-description = "Handles multi-level and recurring commission"
-requires-python = ">=3.14"
+description = "Enterprise-grade multi-level sales commission engine for ERPNext with approval workflows, tiered rates, clawback, and period locking"
+requires-python = ">=3.10"
 readme = "README.md"
 dynamic = ["version"]
 dependencies = [
@@ -25,7 +25,7 @@ packages = []
 
 [tool.ruff]
 line-length = 110
-target-version = "py314"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = [

@@ -2,97 +2,85 @@ name: CI
 
 on:
   push:
-    branches:
-      - version-16
+    branches: [ main, version-15, version-16 ]
   pull_request:
+    branches: [ main, version-15, version-16 ]
 
 concurrency:
-  group: version-16-commission_engine-${{ github.event.number }}
+  group: develop-commission_engine-${{ github.event.number }}
   cancel-in-progress: true
 
 jobs:
-  tests:
+  linter:
+    name: Linter
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install ruff
+      - run: ruff check . --config pyproject.toml
+
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
     strategy:
       fail-fast: false
-    name: Server
 
     services:
-      redis-cache:
-        image: redis:alpine
-        ports:
-          - 13000:6379
-      redis-queue:
-        image: redis:alpine
-        ports:
-          - 11000:6379
       mariadb:
-        image: mariadb:11.8
+        image: mariadb:10.6
         env:
           MYSQL_ROOT_PASSWORD: root
         ports:
           - 3306:3306
         options: --health-cmd="mariadb-admin ping" --health-interval=5s --health-timeout=2s --health-retries=3
 
+      redis-cache:
+        image: redis:alpine
+        ports:
+          - 13000:6379
+
+      redis-queue:
+        image: redis:alpine
+        ports:
+          - 11000:6379
+
     steps:
       - name: Clone
-        uses: actions/checkout@v6
-
-      - name: Find tests
-        run: |
-          echo "Finding tests"
-          grep -rn "def test" > /dev/null
+        uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.14'
+          python-version: '3.12'
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 18
           check-latest: true
 
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/*requirements.txt', '**/pyproject.toml', '**/setup.py', '**/setup.cfg') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-            ${{ runner.os }}-
-
-      - name: Get yarn cache directory path
-        id: yarn-cache-dir-path
-        run: 'echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT'
-
-      - uses: actions/cache@v4
-        id: yarn-cache
-        with:
-          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
-
-      - name: Install MariaDB Client
-        run: |
-          sudo apt update
-          sudo apt-get install mariadb-client
-
-      - name: Setup
+      - name: Install Frappe
+        env:
+          DB_ROOT_PASSWORD: root
         run: |
           pip install frappe-bench
-          bench init --skip-redis-config-generation --skip-assets --python "$(which python)" ~/frappe-bench
+          bench init --skip-redis-config-generation --frappe-branch version-16 ~/frappe-bench
+          mysql --host 127.0.0.1 --port 3306 -uroot -proot -e "SET GLOBAL character_set_server = 'utf8mb4';"
+          mysql --host 127.0.0.1 --port 3306 -uroot -proot -e "SET GLOBAL collation_server = 'utf8mb4_unicode_ci';"
 
-      - name: Install
+      - name: Install App
         working-directory: /home/runner/frappe-bench
         run: |
           bench get-app commission_engine $GITHUB_WORKSPACE
           bench setup requirements --dev
           bench new-site --db-root-password root --admin-password admin test_site
           bench --site test_site install-app commission_engine
-          bench build
+          bench build --app commission_engine
         env:
           CI: 'Yes'
 
