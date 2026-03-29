@@ -6,8 +6,27 @@ import frappe
 
 def after_install():
 	"""Set up default Commission Settings after app install."""
+	_verify_roles()
 	_create_commission_accounts()
 	_set_default_settings()
+
+
+def _verify_roles():
+	"""Ensure the standard ERPNext roles used by Commission Engine exist."""
+	required_roles = [
+		"Sales User",
+		"Sales Manager",
+		"Accounts User",
+		"Accounts Manager",
+	]
+	for role_name in required_roles:
+		if not frappe.db.exists("Role", role_name):
+			role = frappe.new_doc("Role")
+			role.role_name = role_name
+			role.desk_access = 1
+			role.flags.ignore_permissions = True
+			role.insert()
+			frappe.msgprint(f"Created missing role: {role_name}")
 
 
 def _create_commission_accounts():

@@ -4,11 +4,12 @@
 """
 Role-based permission logic for Commission Entry.
 
-Access Rules:
+Access Rules (row-level filtering):
 - Sales User:    Can only see commissions where they are the sales_person
 - Sales Manager: Can see commissions where they or their team members are the
                  sales_person or manager
-- Accounts User / System Manager / Administrator: Can see all commissions
+- Accounts User / Accounts Manager / System Manager / Administrator:
+                 Can see all commissions
 """
 
 import frappe
@@ -22,7 +23,7 @@ def get_permission_query_conditions(user=None):
 	if not user:
 		user = frappe.session.user
 
-	# Admin and Accounts User see everything
+	# Admin and Accounts roles see everything
 	if _is_privileged_user(user):
 		return ""
 
@@ -59,7 +60,7 @@ def has_permission(doc, ptype=None, user=None):
 	if not user:
 		user = frappe.session.user
 
-	# Admin and Accounts User see everything
+	# Admin and Accounts roles see everything
 	if _is_privileged_user(user):
 		return True
 
@@ -87,15 +88,23 @@ def _is_privileged_user(user):
 	"""Check if user has admin/accounts privileges."""
 	if user == "Administrator":
 		return True
-	roles = frappe.get_roles(user)
-	return bool({"System Manager", "Accounts User", "Accounts Manager"} & set(roles))
+	roles = set(frappe.get_roles(user))
+	privileged = {"System Manager", "Accounts User", "Accounts Manager"}
+	return bool(privileged & roles)
 
 
+@frappe.whitelist()
 def _get_user_sales_persons(user):
 	"""
 	Resolve a User to their Sales Person(s).
 	User → Employee → Sales Person
+	Uses frappe cache for performance.
 	"""
+	cache_key = f"commission_engine_user_sp_{user}"
+	cached = frappe.cache.get_value(cache_key)
+	if cached is not None:
+		return cached
+
 	# Find all active employees linked to this user
 	employees = frappe.get_all(
 		"Employee",
@@ -104,6 +113,7 @@ def _get_user_sales_persons(user):
 	)
 
 	if not employees:
+		frappe.cache.set_value(cache_key, [], expires_in_sec=300)
 		return []
 
 	# Find all Sales Persons linked to these employees
@@ -113,6 +123,7 @@ def _get_user_sales_persons(user):
 		pluck="name",
 	)
 
+	frappe.cache.set_value(cache_key, sales_persons, expires_in_sec=300)
 	return sales_persons
 
 
