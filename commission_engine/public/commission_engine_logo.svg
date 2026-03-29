@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <rect width="64" height="64" rx="12" fill="#F4F5F6" />
+  
+  <!-- Bar 1: Blue -->
+  <rect x="14" y="36" width="10" height="16" rx="2" fill="#2490EF" />
+  <!-- Bar 2: Green -->
+  <rect x="28" y="24" width="10" height="28" rx="2" fill="#28C76F" />
+  <!-- Bar 3: Orange/Gold -->
+  <rect x="42" y="14" width="10" height="38" rx="2" fill="#FF9F43" />
+  
+  <!-- Overlay Trend Line -->
+  <path d="M 10 40 L 26 28 L 38 34 L 54 16" stroke="#1E1E1E" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+  <polyline points="46 16 54 16 54 24" stroke="#1E1E1E" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+</svg>
