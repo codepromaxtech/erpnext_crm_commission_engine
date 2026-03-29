@@ -18,7 +18,9 @@ class CommissionSettings(Document):
 		commission_payable_account: DF.Link | None
 		commission_rate_overrides: DF.Table[CommissionRateOverride]
 		enable_approval_workflow: DF.Check
+		enable_multi_level_commission: DF.Check
 		enable_tiered_commission: DF.Check
+		max_commission_levels: DF.Int
 		maximum_commission_cap: DF.Currency
 		minimum_commission_threshold: DF.Currency
 		onetime_manager_pct: DF.Percent

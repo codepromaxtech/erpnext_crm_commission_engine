@@ -11,6 +11,7 @@
         "subscription",
         "commission_type",
         "commission_role",
+        "hierarchy_level",
         "commission_month",
         "company",
         "col_break1",
@@ -167,6 +168,14 @@
             "reqd": 1,
             "in_list_view": 1,
             "in_standard_filter": 1
+        },
+        {
+            "default": "0",
+            "fieldname": "hierarchy_level",
+            "fieldtype": "Int",
+            "label": "Hierarchy Level",
+            "description": "0 = Salesperson, 1 = Direct Manager, 2+ = Higher levels",
+            "read_only": 1
         },
         {
             "fetch_from": "sales_person.sales_person_name",

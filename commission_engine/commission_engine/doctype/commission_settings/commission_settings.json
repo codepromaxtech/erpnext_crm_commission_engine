@@ -20,6 +20,8 @@
         "commission_tiers",
         "controls_section",
         "enable_approval_workflow",
+        "enable_multi_level_commission",
+        "max_commission_levels",
         "minimum_commission_threshold",
         "col_break3",
         "maximum_commission_cap",
@@ -127,6 +129,21 @@
             "fieldtype": "Check",
             "label": "Enable Approval Workflow",
             "description": "When enabled, commissions must be Approved before they can be marked as Paid"
+        },
+        {
+            "default": "0",
+            "fieldname": "enable_multi_level_commission",
+            "fieldtype": "Check",
+            "label": "Enable Multi-Level Commission",
+            "description": "When enabled, commissions are created for every level in the Sales Person tree (not just salesperson + direct manager)"
+        },
+        {
+            "default": "5",
+            "fieldname": "max_commission_levels",
+            "fieldtype": "Int",
+            "label": "Max Commission Levels",
+            "description": "Maximum depth to walk up the Sales Person tree (safety limit)",
+            "depends_on": "eval:doc.enable_multi_level_commission"
         },
         {
             "default": "0",

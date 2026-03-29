@@ -35,6 +35,7 @@ class CommissionEntry(Document):
 		company: DF.Link
 		customer: DF.Link | None
 		customer_name: DF.Data | None
+		hierarchy_level: DF.Int
 		journal_entry: DF.Link | None
 		manager: DF.Link | None
 		manager_commission_amount: DF.Currency
@@ -249,12 +250,13 @@ class CommissionEntry(Document):
 def create_commission_entries(doc, method=None):
 	"""
 	Triggered on Sales Invoice `on_submit`.
-	Creates separate Commission Entries for Salesperson AND Manager.
+	Creates Commission Entries for all levels of the Sales Person hierarchy.
 
 	Handles:
 	- Normal invoices (positive amounts)
 	- Credit notes / returns (negative reversal entries)
 	- Amended invoices (cancel old entries, create new ones)
+	- Multi-level commission (walks Sales Person tree when enabled)
 	"""
 	settings = frappe.get_cached_doc("Commission Settings")
 	sales_team = doc.get("sales_team") or []
@@ -271,6 +273,9 @@ def create_commission_entries(doc, method=None):
 	if doc.amended_from:
 		_cancel_entries_for_invoice(doc.amended_from)
 
+	multi_level = getattr(settings, "enable_multi_level_commission", 0)
+	max_levels = int(getattr(settings, "max_commission_levels", 5) or 5)
+
 	# --- Normal invoice flow ---
 	for row in sales_team:
 		if not row.sales_person:
@@ -278,109 +283,126 @@ def create_commission_entries(doc, method=None):
 
 		is_first = _is_first_invoice(doc.customer, doc.name)
 		commission_type = "One-Time" if is_first else "Recurring"
-
-		# Global default rates
-		if is_first:
-			sp_pct = flt(settings.onetime_salesperson_pct)
-			mgr_pct = flt(settings.onetime_manager_pct)
-		else:
-			sp_pct = flt(settings.recurring_salesperson_pct)
-			mgr_pct = flt(settings.recurring_manager_pct)
-
-		# Per-person overrides
-		sp_pct = _get_override_rate(settings, row.sales_person, "Salesperson", is_first, sp_pct)
-
 		base_amount = flt(row.allocated_amount) or flt(doc.base_net_total)
 
-		# Tiered commission (overrides flat rates if enabled)
-		tiered_pct = _get_tiered_rate(settings, row.sales_person, base_amount, doc.posting_date)
-		if tiered_pct is not None:
-			sp_pct = tiered_pct
+		# Walk the Sales Person tree and create entries at each level
+		hierarchy = _walk_sales_person_tree(row.sales_person, max_levels if multi_level else 1)
 
-		# Find manager via Sales Person tree
-		manager = frappe.db.get_value("Sales Person", row.sales_person, "parent_sales_person")
-		if manager:
-			root = frappe.db.get_value("Sales Person", {"is_group": 1, "parent_sales_person": ""}, "name")
-			if manager == root:
-				manager = None
+		for level, person in enumerate(hierarchy):
+			role = "Salesperson" if level == 0 else "Manager"
 
-		if manager:
-			mgr_pct = _get_override_rate(settings, manager, "Manager", is_first, mgr_pct)
+			# Resolve commission rate for this person
+			pct = _resolve_commission_rate(
+				settings, person, role, is_first, level, base_amount, doc.posting_date
+			)
 
-		# --- Create Salesperson Entry ---
-		sp_amount = flt(base_amount) * flt(sp_pct) / 100
-		cap = flt(settings.maximum_commission_cap)
-		if cap > 0 and sp_amount > cap:
-			sp_amount = cap
+			if not pct:
+				continue
 
-		min_threshold = flt(settings.minimum_commission_threshold)
-		if min_threshold > 0 and sp_amount < min_threshold:
-			pass  # Skip — below minimum
-		else:
+			# Apply cap and threshold
+			amount = flt(base_amount) * flt(pct) / 100
+			cap = flt(settings.maximum_commission_cap)
+			if cap > 0 and amount > cap:
+				amount = cap
+
+			min_threshold = flt(settings.minimum_commission_threshold)
+			if min_threshold > 0 and amount < min_threshold:
+				continue
+
+			# Check for existing entry (no duplicates)
 			existing = frappe.db.exists("Commission Entry", {
 				"sales_invoice": doc.name,
-				"sales_person": row.sales_person,
-				"commission_role": "Salesperson",
+				"sales_person": person,
+				"commission_role": role,
+				"hierarchy_level": level,
 			})
 			if not existing:
-				_insert_commission_entry(doc, row.sales_person, sp_pct, base_amount,
-					commission_type, "Salesperson", manager)
+				# Find this person's direct manager (for backward compat display)
+				mgr = None
+				if level == 0 and len(hierarchy) > 1:
+					mgr = hierarchy[1]
 
-		# --- Create Manager Entry ---
-		if manager and mgr_pct:
-			mgr_amount = flt(base_amount) * flt(mgr_pct) / 100
-			if cap > 0 and mgr_amount > cap:
-				mgr_amount = cap
-
-			if min_threshold > 0 and mgr_amount < min_threshold:
-				pass  # Skip — below minimum
-			else:
-				existing = frappe.db.exists("Commission Entry", {
-					"sales_invoice": doc.name,
-					"sales_person": manager,
-					"commission_role": "Manager",
-				})
-				if not existing:
-					_insert_commission_entry(doc, manager, mgr_pct, base_amount,
-						commission_type, "Manager", None)
+				_insert_commission_entry(
+					doc, person, pct, base_amount,
+					commission_type, role, mgr, level
+				)
 
 	frappe.db.commit()
 
 
-def cancel_commission_entries(doc, method=None):
+def _walk_sales_person_tree(sales_person, max_levels=1):
 	"""
-	Triggered on Sales Invoice `on_cancel`.
-	- Pending/Approved entries → set to Cancelled
-	- Paid entries → create REVERSAL (clawback) entries with negative amounts + reversal JE
+	Walk up the Sales Person tree from the given person.
+	Returns a list of Sales Persons from bottom to top (excluding root).
+
+	Example: [John, Area Manager, Regional Manager, National Manager]
+
+	Args:
+		sales_person: Starting sales person name
+		max_levels: How many levels UP to walk (1 = just direct parent, 5 = up to 5 ancestors)
 	"""
-	entries = frappe.get_all(
-		"Commission Entry",
-		filters={"sales_invoice": doc.name, "status": ["not in", ["Cancelled", "Reversed"]]},
-		fields=["name", "status", "sales_person", "commission_pct", "base_amount",
-		        "commission_role", "commission_type", "company", "customer",
-		        "commission_month", "manager", "commission_amount"],
+	hierarchy = [sales_person]
+
+	# Find root node to know where to stop
+	root = frappe.db.get_value(
+		"Sales Person", {"is_group": 1, "parent_sales_person": ""}, "name"
 	)
 
-	settings = frappe.get_cached_doc("Commission Settings")
+	current = sales_person
+	for _ in range(max_levels):
+		parent = frappe.db.get_value("Sales Person", current, "parent_sales_person")
+		if not parent or parent == root or parent == current:
+			break
 
-	for entry in entries:
-		if entry.status in ("Pending", "Approved"):
-			# Simply cancel
-			frappe.db.set_value("Commission Entry", entry.name, "status", "Cancelled")
-		elif entry.status == "Paid":
-			# CLAWBACK: Create reversal entry with negative amount
-			_create_clawback_entry(entry, settings)
+		# Check if parent is enabled
+		enabled = frappe.db.get_value("Sales Person", parent, "enabled")
+		if not enabled:
+			# Skip disabled nodes but keep walking up
+			current = parent
+			continue
 
-	if entries:
-		frappe.db.commit()
+		hierarchy.append(parent)
+		current = parent
+
+	return hierarchy
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+def _resolve_commission_rate(settings, sales_person, role, is_first, level, base_amount, posting_date):
+	"""
+	Resolve the commission rate for a person at a given hierarchy level.
+
+	Priority:
+	1. Commission Rate Override table (per-person overrides)
+	2. Tiered commission (if enabled, for salesperson level only)
+	3. Sales Person.commission_rate field (ERPNext built-in)
+	4. Global defaults from Commission Settings (SP rate for level 0, Manager rate for level 1+)
+	"""
+	# 1. Check per-person overrides in Commission Settings
+	role_for_override = "Salesperson" if level == 0 else "Manager"
+	override_rate = _get_override_rate(settings, sales_person, role_for_override, is_first, 0)
+	if override_rate:
+		return override_rate
+
+	# 2. Tiered commission (for salesperson level only)
+	if level == 0:
+		tiered_pct = _get_tiered_rate(settings, sales_person, base_amount, posting_date)
+		if tiered_pct is not None:
+			return tiered_pct
+
+	# 3. Sales Person.commission_rate field (ERPNext built-in field)
+	sp_rate = flt(frappe.db.get_value("Sales Person", sales_person, "commission_rate"))
+	if sp_rate:
+		return sp_rate
+
+	# 4. Global defaults
+	if level == 0:
+		return flt(settings.onetime_salesperson_pct) if is_first else flt(settings.recurring_salesperson_pct)
+	else:
+		return flt(settings.onetime_manager_pct) if is_first else flt(settings.recurring_manager_pct)
+
 
 def _insert_commission_entry(doc, sales_person, pct, base_amount,
-                             commission_type, role, manager):
+                             commission_type, role, manager, hierarchy_level=0):
 	"""Create and insert a single Commission Entry."""
 	entry = frappe.new_doc("Commission Entry")
 	entry.update({
@@ -389,6 +411,7 @@ def _insert_commission_entry(doc, sales_person, pct, base_amount,
 		"customer": doc.customer,
 		"commission_type": commission_type,
 		"commission_role": role,
+		"hierarchy_level": hierarchy_level,
 		"commission_month": get_first_day(getdate(doc.posting_date)),
 		"sales_person": sales_person,
 		"commission_pct": pct,
