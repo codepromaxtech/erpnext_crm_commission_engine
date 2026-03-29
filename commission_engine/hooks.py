@@ -14,7 +14,7 @@ app_license = "mit"
 add_to_apps_screen = [
 	{
 		"name": "commission_engine",
-		"logo": "/assets/commission_engine/commission_engine_logo.svg",
+		"logo": "/assets/commission_engine/commission_engine_logo.png",
 		"title": "Commission Engine",
 		"route": "/app/commission-engine",
 	}
