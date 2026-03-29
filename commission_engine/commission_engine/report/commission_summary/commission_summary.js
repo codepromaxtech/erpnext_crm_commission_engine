@@ -22,10 +22,10 @@ frappe.query_reports["Commission Summary"] = {
             options: "Sales Person",
         },
         {
-            fieldname: "manager",
-            label: __("Manager"),
-            fieldtype: "Link",
-            options: "Sales Person",
+            fieldname: "commission_role",
+            label: __("Role"),
+            fieldtype: "Select",
+            options: "\nSalesperson\nManager",
         },
         {
             fieldname: "commission_type",
@@ -37,7 +37,7 @@ frappe.query_reports["Commission Summary"] = {
             fieldname: "status",
             label: __("Status"),
             fieldtype: "Select",
-            options: "\nPending\nPaid",
+            options: "\nPending\nApproved\nPaid\nReversed",
         },
         {
             fieldname: "company",

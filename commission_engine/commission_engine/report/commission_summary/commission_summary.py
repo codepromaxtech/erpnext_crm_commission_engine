@@ -21,6 +21,13 @@ def execute(filters=None):
 def get_columns():
 	return [
 		{
+			"label": _("Commission Entry"),
+			"fieldname": "name",
+			"fieldtype": "Link",
+			"options": "Commission Entry",
+			"width": 180,
+		},
+		{
 			"label": _("Sales Person"),
 			"fieldname": "sales_person",
 			"fieldtype": "Link",
@@ -28,23 +35,16 @@ def get_columns():
 			"width": 160,
 		},
 		{
-			"label": _("Sales Person Name"),
+			"label": _("Person Name"),
 			"fieldname": "sales_person_name",
 			"fieldtype": "Data",
-			"width": 160,
+			"width": 150,
 		},
 		{
-			"label": _("Manager"),
-			"fieldname": "manager",
-			"fieldtype": "Link",
-			"options": "Sales Person",
-			"width": 140,
-		},
-		{
-			"label": _("Manager Name"),
-			"fieldname": "manager_name",
+			"label": _("Role"),
+			"fieldname": "commission_role",
 			"fieldtype": "Data",
-			"width": 140,
+			"width": 100,
 		},
 		{
 			"label": _("Customer"),
@@ -79,32 +79,14 @@ def get_columns():
 			"width": 130,
 		},
 		{
-			"label": _("SP Commission %"),
+			"label": _("Commission %"),
 			"fieldname": "commission_pct",
 			"fieldtype": "Percent",
-			"width": 120,
+			"width": 110,
 		},
 		{
-			"label": _("SP Commission"),
+			"label": _("Commission Amount"),
 			"fieldname": "commission_amount",
-			"fieldtype": "Currency",
-			"width": 130,
-		},
-		{
-			"label": _("Mgr Commission %"),
-			"fieldname": "manager_commission_pct",
-			"fieldtype": "Percent",
-			"width": 120,
-		},
-		{
-			"label": _("Mgr Commission"),
-			"fieldname": "manager_commission_amount",
-			"fieldtype": "Currency",
-			"width": 130,
-		},
-		{
-			"label": _("Total Commission"),
-			"fieldname": "total_commission",
 			"fieldtype": "Currency",
 			"width": 140,
 		},
@@ -112,7 +94,7 @@ def get_columns():
 			"label": _("Status"),
 			"fieldname": "status",
 			"fieldtype": "Data",
-			"width": 90,
+			"width": 100,
 		},
 	]
 
@@ -126,8 +108,7 @@ def get_data(filters):
 			ce.name,
 			ce.sales_person,
 			ce.sales_person_name,
-			ce.manager,
-			ce.manager_name,
+			ce.commission_role,
 			ce.customer,
 			ce.customer_name,
 			ce.sales_invoice,
@@ -136,12 +117,9 @@ def get_data(filters):
 			ce.base_amount,
 			ce.commission_pct,
 			ce.commission_amount,
-			ce.manager_commission_pct,
-			ce.manager_commission_amount,
-			(IFNULL(ce.commission_amount, 0) + IFNULL(ce.manager_commission_amount, 0)) AS total_commission,
 			ce.status
 		FROM `tabCommission Entry` ce
-		WHERE ce.status != 'Cancelled'
+		WHERE ce.status NOT IN ('Cancelled')
 		{conditions}
 		ORDER BY ce.commission_month DESC, ce.sales_person
 		""".format(conditions=conditions),
@@ -165,9 +143,9 @@ def get_conditions(filters):
 	if filters.get("sales_person"):
 		conditions.append("AND ce.sales_person = %(sales_person)s")
 		values["sales_person"] = filters["sales_person"]
-	if filters.get("manager"):
-		conditions.append("AND ce.manager = %(manager)s")
-		values["manager"] = filters["manager"]
+	if filters.get("commission_role"):
+		conditions.append("AND ce.commission_role = %(commission_role)s")
+		values["commission_role"] = filters["commission_role"]
 	if filters.get("status"):
 		conditions.append("AND ce.status = %(status)s")
 		values["status"] = filters["status"]
@@ -185,13 +163,11 @@ def get_chart(data):
 	if not data:
 		return None
 
-	# Group by sales person for chart
 	sp_totals = {}
 	for row in data:
 		sp = row.get("sales_person_name") or row.get("sales_person")
 		sp_totals[sp] = sp_totals.get(sp, 0) + flt(row.get("commission_amount"))
 
-	# Top 10
 	sorted_sp = sorted(sp_totals.items(), key=lambda x: x[1], reverse=True)[:10]
 	labels = [x[0] for x in sorted_sp]
 	values = [x[1] for x in sorted_sp]
@@ -203,19 +179,21 @@ def get_chart(data):
 		},
 		"type": "bar",
 		"colors": ["#7cd6fd"],
-		"title": _("Top Salesperson Commissions"),
+		"title": _("Top Commission Earners"),
 	}
 
 
 def get_report_summary(data):
-	total_commission = sum(flt(r.get("commission_amount", 0)) for r in data)
-	total_manager = sum(flt(r.get("manager_commission_amount", 0)) for r in data)
-	total_all = sum(flt(r.get("total_commission", 0)) for r in data)
-	pending = sum(flt(r.get("total_commission", 0)) for r in data if r.get("status") == "Pending")
+	sp_commission = sum(flt(r.get("commission_amount", 0)) for r in data if r.get("commission_role") == "Salesperson")
+	mgr_commission = sum(flt(r.get("commission_amount", 0)) for r in data if r.get("commission_role") == "Manager")
+	total_all = sum(flt(r.get("commission_amount", 0)) for r in data)
+	pending = sum(flt(r.get("commission_amount", 0)) for r in data if r.get("status") == "Pending")
+	approved = sum(flt(r.get("commission_amount", 0)) for r in data if r.get("status") == "Approved")
 
 	return [
-		{"value": total_commission, "label": _("Total SP Commission"), "datatype": "Currency", "indicator": "Green"},
-		{"value": total_manager, "label": _("Total Mgr Commission"), "datatype": "Currency", "indicator": "Blue"},
+		{"value": sp_commission, "label": _("Salesperson Commission"), "datatype": "Currency", "indicator": "Green"},
+		{"value": mgr_commission, "label": _("Manager Commission"), "datatype": "Currency", "indicator": "Blue"},
 		{"value": total_all, "label": _("Grand Total"), "datatype": "Currency", "indicator": "Purple"},
-		{"value": pending, "label": _("Pending Payable"), "datatype": "Currency", "indicator": "Orange"},
+		{"value": pending, "label": _("Pending"), "datatype": "Currency", "indicator": "Orange"},
+		{"value": approved, "label": _("Approved (Awaiting Payment)"), "datatype": "Currency", "indicator": "Blue"},
 	]

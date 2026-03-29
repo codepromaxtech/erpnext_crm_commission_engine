@@ -411,6 +411,7 @@ def _create_reversal_entries(doc, settings):
 			"status": "Pending",
 		})
 		reversal.flags.ignore_permissions = True
+		reversal.flags.ignore_period_lock = True  # Reversals must bypass period lock
 		reversal.insert()
 
 		# Mark original as reversed
@@ -429,7 +430,6 @@ def _create_clawback_entry(entry, settings):
 	"""
 	reversal = frappe.new_doc("Commission Entry")
 	reversal.update({
-		"sales_invoice": entry.name.split("-")[0] if "-" in str(entry.name) else "",  # Keep reference
 		"sales_invoice": frappe.db.get_value("Commission Entry", entry.name, "sales_invoice"),
 		"company": entry.company,
 		"customer": entry.customer,
@@ -445,6 +445,7 @@ def _create_clawback_entry(entry, settings):
 		"status": "Paid",  # Auto-paid since it's a clawback
 	})
 	reversal.flags.ignore_permissions = True
+	reversal.flags.ignore_period_lock = True  # Clawback must bypass period lock
 	reversal.insert()
 
 	# Auto-create reversal JE
