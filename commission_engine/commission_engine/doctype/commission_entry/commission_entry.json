@@ -17,6 +17,8 @@
         "customer",
         "customer_name",
         "base_amount",
+        "invoice_currency",
+        "exchange_rate",
         "status",
         "salesperson_section",
         "sales_person",
@@ -122,6 +124,25 @@
             "label": "Invoice Net Amount",
             "description": "The allocated amount from the Sales Team row",
             "read_only": 1
+        },
+        {
+            "fetch_from": "sales_invoice.currency",
+            "fieldname": "invoice_currency",
+            "fieldtype": "Link",
+            "label": "Invoice Currency",
+            "options": "Currency",
+            "read_only": 1,
+            "fetch_if_empty": 1
+        },
+        {
+            "default": "1",
+            "fetch_from": "sales_invoice.conversion_rate",
+            "fieldname": "exchange_rate",
+            "fieldtype": "Float",
+            "label": "Exchange Rate",
+            "read_only": 1,
+            "fetch_if_empty": 1,
+            "precision": 9
         },
         {
             "default": "Pending",

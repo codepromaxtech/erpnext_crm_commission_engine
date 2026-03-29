@@ -254,6 +254,11 @@ def create_commission_entries(doc, method=None):
 
 		base_amount = flt(row.allocated_amount) or flt(doc.base_net_total)
 
+		# Tiered commission (overrides flat rates if enabled)
+		tiered_pct = _get_tiered_rate(settings, row.sales_person, base_amount, doc.posting_date)
+		if tiered_pct is not None:
+			sp_pct = tiered_pct
+
 		# Find manager via Sales Person tree
 		manager = frappe.db.get_value("Sales Person", row.sales_person, "parent_sales_person")
 		if manager:
@@ -501,3 +506,41 @@ def _get_override_rate(settings, sales_person, role, is_first, default_pct):
 				return rate
 			break
 	return default_pct
+
+
+def _get_tiered_rate(settings, sales_person, invoice_amount, posting_date):
+	"""
+	When tiered commission is enabled, calculate the rate based on
+	cumulative monthly sales for this salesperson.
+	Returns the tiered rate if matched, or None if no tier matches.
+	"""
+	if not settings.enable_tiered_commission:
+		return None
+
+	tiers = settings.get("commission_tiers") or []
+	if not tiers:
+		return None
+
+	# Calculate cumulative sales this month for this salesperson
+	month_start = get_first_day(getdate(posting_date))
+	cumulative = frappe.db.sql("""
+		SELECT COALESCE(SUM(st.allocated_amount), 0)
+		FROM `tabSales Team` st
+		JOIN `tabSales Invoice` si ON si.name = st.parent
+		WHERE st.parenttype = 'Sales Invoice'
+		AND st.sales_person = %s
+		AND si.docstatus = 1
+		AND si.is_return = 0
+		AND si.posting_date >= %s
+	""", (sales_person, month_start))[0][0]
+
+	cumulative = flt(cumulative) + flt(invoice_amount)
+
+	# Find matching tier
+	for tier in sorted(tiers, key=lambda t: flt(t.from_amount)):
+		to_amt = flt(tier.to_amount)
+		if flt(tier.from_amount) <= cumulative and (to_amt == 0 or cumulative <= to_amt):
+			return flt(tier.commission_pct)
+
+	return None
+

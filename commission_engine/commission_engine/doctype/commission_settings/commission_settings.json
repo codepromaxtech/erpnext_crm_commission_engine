@@ -15,6 +15,9 @@
         "col_break2",
         "override_section",
         "commission_rate_overrides",
+        "tier_section",
+        "enable_tiered_commission",
+        "commission_tiers",
         "controls_section",
         "enable_approval_workflow",
         "minimum_commission_threshold",
@@ -90,6 +93,28 @@
             "label": "Rate Overrides",
             "options": "Commission Rate Override",
             "description": "Add rows here only for people who need a different rate than the defaults above"
+        },
+        {
+            "fieldname": "tier_section",
+            "fieldtype": "Section Break",
+            "label": "Tiered Commission Rates",
+            "description": "Optional: define rate tiers based on cumulative monthly sales. When enabled, these override default rates.",
+            "collapsible": 1
+        },
+        {
+            "default": "0",
+            "fieldname": "enable_tiered_commission",
+            "fieldtype": "Check",
+            "label": "Enable Tiered Commission",
+            "description": "When enabled, commission rates are determined by cumulative sales for the month"
+        },
+        {
+            "fieldname": "commission_tiers",
+            "fieldtype": "Table",
+            "label": "Commission Tiers",
+            "options": "Commission Tier",
+            "depends_on": "eval:doc.enable_tiered_commission",
+            "description": "From Amount → To Amount → Commission %. Set 'To Amount' to 0 for unlimited."
         },
         {
             "fieldname": "controls_section",
