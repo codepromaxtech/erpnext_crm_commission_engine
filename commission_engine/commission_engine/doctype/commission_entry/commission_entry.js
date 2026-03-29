@@ -7,14 +7,19 @@ frappe.ui.form.on("Commission Entry", {
         frm.trigger("render_commission_dashboard");
         frm.trigger("setup_actions");
 
-        // Timeline badge
+        // Role + Type badge in timeline
         if (!frm.doc.__islocal && frm.doc.commission_type) {
-            const badge_color = frm.doc.commission_type === "One-Time" ? "#5e64ff" : "#29cd42";
+            const type_color = frm.doc.commission_type === "One-Time" ? "#5e64ff" : "#29cd42";
+            const role_color = frm.doc.commission_role === "Manager" ? "#f5a623" : "#5e64ff";
             frm.timeline.wrapper && frm.timeline.wrapper.prepend(`
-                <div style="padding: 8px 15px; margin-bottom: 8px;">
-                    <span style="background: ${badge_color}; color: #fff; padding: 3px 10px;
+                <div style="padding: 8px 15px; margin-bottom: 8px; display: flex; gap: 6px;">
+                    <span style="background: ${role_color}; color: #fff; padding: 3px 10px;
                         border-radius: 12px; font-size: 11px; font-weight: 600; text-transform: uppercase;">
-                        ${frm.doc.commission_type} Commission
+                        ${frm.doc.commission_role || "Salesperson"}
+                    </span>
+                    <span style="background: ${type_color}; color: #fff; padding: 3px 10px;
+                        border-radius: 12px; font-size: 11px; font-weight: 600; text-transform: uppercase;">
+                        ${frm.doc.commission_type}
                     </span>
                 </div>
             `);
@@ -26,13 +31,11 @@ frappe.ui.form.on("Commission Entry", {
 
         if (frm.doc.status === "Pending" && !frm.doc.__islocal) {
             frm.add_custom_button(__("Mark as Paid"), () => {
-                const base = flt(frm.doc.base_amount);
-                const sp_amt = flt(frm.doc.commission_amount);
-                const mgr_amt = flt(frm.doc.manager_commission_amount);
-                const total = sp_amt + mgr_amt;
+                const amount = flt(frm.doc.commission_amount);
                 const currency = frappe.boot.sysdefaults.currency || "USD";
+                const role = frm.doc.commission_role || "Salesperson";
+                const payee = frm.doc.sales_person_name || frm.doc.sales_person;
 
-                // Fetch commission settings for account info
                 frappe.xcall("frappe.client.get", {
                     doctype: "Commission Settings",
                     name: "Commission Settings"
@@ -44,83 +47,50 @@ frappe.ui.form.on("Commission Entry", {
                     let msg = `
                     <div style="padding:8px 0;">
                         <div style="font-size:13px; font-weight:700; color:#2d3748; margin-bottom:12px;">
-                            📋 Payment Summary for ${frm.doc.name}
+                            📋 Payment for ${frm.doc.name}
                         </div>
-
                         <table style="width:100%; border-collapse:collapse; font-size:12px; margin-bottom:14px;">
                             <tr style="background:#f0f4ff;">
-                                <td colspan="2" style="padding:8px 10px; font-weight:700; color:#5e64ff;">
-                                    Invoice Details
-                                </td>
+                                <td style="padding:6px 10px; color:#6b7280;">Sales Invoice</td>
+                                <td style="padding:6px 10px; font-weight:600;">${frm.doc.sales_invoice}</td>
                             </tr>
                             <tr>
-                                <td style="padding:6px 10px; border-bottom:1px solid #f0f0f0; color:#6b7280;">Sales Invoice</td>
-                                <td style="padding:6px 10px; border-bottom:1px solid #f0f0f0; font-weight:600;">${frm.doc.sales_invoice}</td>
+                                <td style="padding:6px 10px; color:#6b7280;">Customer</td>
+                                <td style="padding:6px 10px; font-weight:600;">${frm.doc.customer_name || frm.doc.customer}</td>
                             </tr>
-                            <tr>
-                                <td style="padding:6px 10px; border-bottom:1px solid #f0f0f0; color:#6b7280;">Customer</td>
-                                <td style="padding:6px 10px; border-bottom:1px solid #f0f0f0; font-weight:600;">${frm.doc.customer_name || frm.doc.customer}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding:6px 10px; border-bottom:1px solid #f0f0f0; color:#6b7280;">Invoice Amount</td>
-                                <td style="padding:6px 10px; border-bottom:1px solid #f0f0f0; font-weight:600;">${format_currency(base, currency)}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding:6px 10px; border-bottom:1px solid #f0f0f0; color:#6b7280;">Commission Type</td>
-                                <td style="padding:6px 10px; border-bottom:1px solid #f0f0f0;">
-                                    <span style="background:${frm.doc.commission_type === 'One-Time' ? '#5e64ff' : '#29cd42'};
-                                        color:#fff; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:600;">
-                                        ${frm.doc.commission_type}
-                                    </span>
-                                </td>
+                            <tr style="background:#f0f4ff;">
+                                <td style="padding:6px 10px; color:#6b7280;">Invoice Amount</td>
+                                <td style="padding:6px 10px; font-weight:600;">${format_currency(flt(frm.doc.base_amount), currency)}</td>
                             </tr>
                         </table>
 
                         <table style="width:100%; border-collapse:collapse; font-size:12px; margin-bottom:14px;">
                             <tr style="background:#e8f5e9;">
-                                <td colspan="3" style="padding:8px 10px; font-weight:700; color:#2e7d32;">
+                                <td colspan="2" style="padding:8px 10px; font-weight:700; color:#2e7d32;">
                                     💰 Commission Payout
                                 </td>
                             </tr>
+                            <tr>
+                                <td style="padding:6px 10px; color:#6b7280;">Payee</td>
+                                <td style="padding:6px 10px; font-weight:600;">${payee}</td>
+                            </tr>
                             <tr style="background:#f8f9fc;">
-                                <td style="padding:6px 10px; font-weight:600; color:#6b7280;">Role</td>
-                                <td style="padding:6px 10px; font-weight:600; color:#6b7280;">Person</td>
-                                <td style="padding:6px 10px; font-weight:600; color:#6b7280; text-align:right;">Amount</td>
+                                <td style="padding:6px 10px; color:#6b7280;">Role</td>
+                                <td style="padding:6px 10px;">
+                                    <span style="background:${role === 'Manager' ? '#f5a623' : '#5e64ff'};
+                                        color:#fff; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:600;">
+                                        ${role}
+                                    </span>
+                                </td>
                             </tr>
                             <tr>
-                                <td style="padding:6px 10px; border-bottom:1px solid #f0f0f0;">
-                                    <span style="background:#5e64ff; color:#fff; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:600;">Salesperson</span>
-                                </td>
-                                <td style="padding:6px 10px; border-bottom:1px solid #f0f0f0; font-weight:600;">
-                                    ${frm.doc.sales_person_name || frm.doc.sales_person}
-                                </td>
-                                <td style="padding:6px 10px; border-bottom:1px solid #f0f0f0; text-align:right; font-weight:700; color:#5e64ff;">
-                                    ${format_currency(sp_amt, currency)} <span style="color:#9ca3af; font-weight:400;">(${flt(frm.doc.commission_pct, 2)}%)</span>
-                                </td>
-                            </tr>`;
-
-                    if (frm.doc.manager) {
-                        msg += `
-                            <tr>
-                                <td style="padding:6px 10px; border-bottom:1px solid #f0f0f0;">
-                                    <span style="background:#f5a623; color:#fff; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:600;">Manager</span>
-                                </td>
-                                <td style="padding:6px 10px; border-bottom:1px solid #f0f0f0; font-weight:600;">
-                                    ${frm.doc.manager_name || frm.doc.manager}
-                                </td>
-                                <td style="padding:6px 10px; border-bottom:1px solid #f0f0f0; text-align:right; font-weight:700; color:#f5a623;">
-                                    ${format_currency(mgr_amt, currency)} <span style="color:#9ca3af; font-weight:400;">(${flt(frm.doc.manager_commission_pct, 2)}%)</span>
-                                </td>
-                            </tr>`;
-                    }
-
-                    msg += `
+                                <td style="padding:6px 10px; color:#6b7280;">Rate</td>
+                                <td style="padding:6px 10px; font-weight:600;">${flt(frm.doc.commission_pct, 2)}%</td>
+                            </tr>
                             <tr style="background:#e8f5e9;">
-                                <td colspan="2" style="padding:8px 10px; font-weight:700; color:#2e7d32;">
-                                    Total Payout
-                                </td>
-                                <td style="padding:8px 10px; text-align:right; font-weight:700; font-size:14px; color:#2e7d32;">
-                                    ${format_currency(total, currency)}
+                                <td style="padding:8px 10px; font-weight:700; color:#2e7d32;">Amount</td>
+                                <td style="padding:8px 10px; font-weight:700; font-size:14px; color:#2e7d32;">
+                                    ${format_currency(amount, currency)}
                                 </td>
                             </tr>
                         </table>`;
@@ -134,24 +104,19 @@ frappe.ui.form.on("Commission Entry", {
                                 </td>
                             </tr>
                             <tr>
-                                <td style="padding:6px 10px; border-bottom:1px solid #f0f0f0; color:#6b7280;">Debit Account</td>
-                                <td style="padding:6px 10px; border-bottom:1px solid #f0f0f0; font-weight:600;">${expense_acct}</td>
+                                <td style="padding:6px 10px; color:#6b7280;">Debit</td>
+                                <td style="padding:6px 10px; font-weight:600;">${expense_acct}</td>
                             </tr>
-                            <tr>
-                                <td style="padding:6px 10px; border-bottom:1px solid #f0f0f0; color:#6b7280;">Credit Account</td>
-                                <td style="padding:6px 10px; border-bottom:1px solid #f0f0f0; font-weight:600;">${payable_acct}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding:6px 10px; border-bottom:1px solid #f0f0f0; color:#6b7280;">Posting Date</td>
-                                <td style="padding:6px 10px; border-bottom:1px solid #f0f0f0; font-weight:600;">${frappe.datetime.nowdate()}</td>
+                            <tr style="background:#f8f9fc;">
+                                <td style="padding:6px 10px; color:#6b7280;">Credit</td>
+                                <td style="padding:6px 10px; font-weight:600;">${payable_acct}</td>
                             </tr>
                             <tr>
                                 <td style="padding:6px 10px; color:#6b7280;">Amount</td>
-                                <td style="padding:6px 10px; font-weight:700; color:#e65100;">${format_currency(total, currency)}</td>
+                                <td style="padding:6px 10px; font-weight:700; color:#e65100;">${format_currency(amount, currency)}</td>
                             </tr>
                         </table>`;
                     }
-
                     msg += `</div>`;
 
                     frappe.confirm(
@@ -160,7 +125,8 @@ frappe.ui.form.on("Commission Entry", {
                             frm.set_value("status", "Paid");
                             frm.save().then(() => {
                                 frappe.show_alert({
-                                    message: __("Commission marked as Paid — Total: {0}", [format_currency(total, currency)]),
+                                    message: __("{0} commission paid to {1}: {2}",
+                                        [role, payee, format_currency(amount, currency)]),
                                     indicator: "green"
                                 });
                             });
@@ -185,12 +151,8 @@ frappe.ui.form.on("Commission Entry", {
                     }
                 );
             }, __("Actions"));
-
-            // Make the primary action stand out
-            frm.page.btn_primary && frm.page.btn_primary.addClass("btn-primary-dark");
         }
 
-        // Quick link to Journal Entry
         if (frm.doc.journal_entry) {
             frm.add_custom_button(__("View Journal Entry"), () => {
                 frappe.set_route("Form", "Journal Entry", frm.doc.journal_entry);
@@ -202,10 +164,10 @@ frappe.ui.form.on("Commission Entry", {
         if (frm.doc.__islocal) return;
 
         const base = flt(frm.doc.base_amount);
-        const sp_amt = flt(frm.doc.commission_amount);
-        const mgr_amt = flt(frm.doc.manager_commission_amount);
-        const total = sp_amt + mgr_amt;
+        const amount = flt(frm.doc.commission_amount);
         const currency = frappe.boot.sysdefaults.currency || "USD";
+        const role = frm.doc.commission_role || "Salesperson";
+        const role_color = role === "Manager" ? "#f5a623" : "#5e64ff";
 
         const status_config = {
             "Pending": { color: "#f5a623", bg: "#fef3e0", icon: "⏳" },
@@ -217,7 +179,6 @@ frappe.ui.form.on("Commission Entry", {
         const section = frm.fields_dict.invoice_section;
         const wrapper = section.$wrapper || section.wrapper;
 
-        // Remove any previous dashboard
         $(wrapper).find(".commission-dashboard").remove();
 
         const html = `
@@ -233,48 +194,34 @@ frappe.ui.form.on("Commission Entry", {
                     </div>
                 </div>
 
-                <!-- Salesperson Commission -->
+                <!-- Commission -->
                 <div style="flex: 1; min-width: 150px; background: #f0f4ff; border-radius: 10px;
-                    padding: 16px; border-left: 4px solid #5e64ff;">
+                    padding: 16px; border-left: 4px solid ${role_color};">
                     <div style="font-size: 11px; color: #8d99ae; text-transform: uppercase; font-weight: 600;
                         letter-spacing: 0.5px; margin-bottom: 4px;">
-                        Salesperson (${flt(frm.doc.commission_pct, 2)}%)
+                        <span style="background: ${role_color}; color: #fff; padding: 1px 6px;
+                            border-radius: 8px; font-size: 9px;">${role}</span>
+                        Commission (${flt(frm.doc.commission_pct, 2)}%)
                     </div>
-                    <div style="font-size: 20px; font-weight: 700; color: #5e64ff;">
-                        ${format_currency(sp_amt, currency)}
+                    <div style="font-size: 20px; font-weight: 700; color: ${role_color};">
+                        ${format_currency(amount, currency)}
                     </div>
                     <div style="font-size: 11px; color: #6b7280; margin-top: 2px;">
                         ${frm.doc.sales_person_name || frm.doc.sales_person || "—"}
                     </div>
                 </div>
 
-                <!-- Manager Commission -->
-                <div style="flex: 1; min-width: 150px; background: ${frm.doc.manager ? '#f0fdf4' : '#f9fafb'}; border-radius: 10px;
-                    padding: 16px; border-left: 4px solid ${frm.doc.manager ? '#29cd42' : '#d1d5db'};">
-                    <div style="font-size: 11px; color: #8d99ae; text-transform: uppercase; font-weight: 600;
-                        letter-spacing: 0.5px; margin-bottom: 4px;">
-                        Manager (${flt(frm.doc.manager_commission_pct, 2)}%)
-                    </div>
-                    <div style="font-size: 20px; font-weight: 700; color: ${frm.doc.manager ? '#29cd42' : '#9ca3af'};">
-                        ${frm.doc.manager ? format_currency(mgr_amt, currency) : "N/A"}
-                    </div>
-                    <div style="font-size: 11px; color: #6b7280; margin-top: 2px;">
-                        ${frm.doc.manager_name || frm.doc.manager || "No manager assigned"}
-                    </div>
-                </div>
-
-                <!-- Total + Status -->
+                <!-- Status -->
                 <div style="flex: 1; min-width: 150px; background: ${st.bg}; border-radius: 10px;
                     padding: 16px; border-left: 4px solid ${st.color};">
                     <div style="font-size: 11px; color: #8d99ae; text-transform: uppercase; font-weight: 600;
-                        letter-spacing: 0.5px; margin-bottom: 4px;">Total Commission</div>
+                        letter-spacing: 0.5px; margin-bottom: 4px;">Status</div>
                     <div style="font-size: 20px; font-weight: 700; color: ${st.color};">
-                        ${format_currency(total, currency)}
+                        ${st.icon} ${frm.doc.status}
                     </div>
-                    <div style="font-size: 11px; margin-top: 2px;">
-                        <span style="background: ${st.color}; color: #fff; padding: 2px 8px;
-                            border-radius: 10px; font-weight: 600;">${st.icon} ${frm.doc.status}</span>
-                    </div>
+                    ${frm.doc.journal_entry
+                ? `<div style="font-size: 11px; color: #6b7280; margin-top: 2px;">JE: ${frm.doc.journal_entry}</div>`
+                : ""}
                 </div>
             </div>
         </div>`;
@@ -286,10 +233,6 @@ frappe.ui.form.on("Commission Entry", {
         frm.trigger("calculate_amounts");
     },
 
-    manager_commission_pct(frm) {
-        frm.trigger("calculate_amounts");
-    },
-
     base_amount(frm) {
         frm.trigger("calculate_amounts");
     },
@@ -297,7 +240,6 @@ frappe.ui.form.on("Commission Entry", {
     calculate_amounts(frm) {
         const base = flt(frm.doc.base_amount);
         frm.set_value("commission_amount", base * flt(frm.doc.commission_pct) / 100);
-        frm.set_value("manager_commission_amount", base * flt(frm.doc.manager_commission_pct) / 100);
     },
 
     set_status_indicator(frm) {

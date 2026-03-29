@@ -10,6 +10,7 @@
         "sales_invoice",
         "subscription",
         "commission_type",
+        "commission_role",
         "commission_month",
         "company",
         "col_break1",
@@ -59,6 +60,16 @@
             "fieldtype": "Select",
             "label": "Commission Type",
             "options": "One-Time\nRecurring",
+            "reqd": 1,
+            "in_list_view": 1,
+            "in_standard_filter": 1
+        },
+        {
+            "fieldname": "commission_role",
+            "fieldtype": "Select",
+            "label": "Commission Role",
+            "options": "Salesperson\nManager",
+            "default": "Salesperson",
             "reqd": 1,
             "in_list_view": 1,
             "in_standard_filter": 1
