@@ -56,6 +56,7 @@ frappe.ui.form.on("Commission Entry", {
                                 message: __("Commission Approved ✓"),
                                 indicator: "blue"
                             });
+                            frm.reload_doc();
                         });
                     }
                 );
@@ -66,6 +67,7 @@ frappe.ui.form.on("Commission Entry", {
                     frm.set_value("status", "Cancelled");
                     frm.save().then(() => {
                         frappe.show_alert({ message: __("Cancelled"), indicator: "red" });
+                        frm.reload_doc();
                     });
                 });
             }, __("Actions"));
@@ -135,6 +137,7 @@ frappe.ui.form.on("Commission Entry", {
                                         [role, payee, format_currency(amount, currency)]),
                                     indicator: "green"
                                 });
+                                frm.reload_doc();
                             });
                         },
                         () => { },
@@ -149,6 +152,7 @@ frappe.ui.form.on("Commission Entry", {
                     frm.set_value("status", "Cancelled");
                     frm.save().then(() => {
                         frappe.show_alert({ message: __("Cancelled"), indicator: "red" });
+                        frm.reload_doc();
                     });
                 });
             }, __("Actions"));
@@ -174,6 +178,7 @@ frappe.ui.form.on("Commission Entry", {
                                         message: __("Paid ✓"),
                                         indicator: "green"
                                     });
+                                    frm.reload_doc();
                                 });
                             }
                         );

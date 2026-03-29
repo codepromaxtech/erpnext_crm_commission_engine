@@ -7,6 +7,16 @@ from frappe.model.document import Document
 from frappe.utils import flt, getdate, get_first_day, nowdate, now
 
 
+# Valid status transitions
+VALID_TRANSITIONS = {
+	"Pending": ["Approved", "Paid", "Cancelled"],
+	"Approved": ["Paid", "Cancelled"],
+	"Paid": ["Reversed"],   # Only system can do this (clawback)
+	"Cancelled": [],
+	"Reversed": [],
+}
+
+
 class CommissionEntry(Document):
 	# begin: auto-generated types
 	from typing import TYPE_CHECKING
@@ -49,6 +59,7 @@ class CommissionEntry(Document):
 						self.commission_month)
 				)
 
+		# Calculate commission amount
 		self.commission_amount = flt(self.base_amount) * flt(self.commission_pct) / 100
 
 		# Apply maximum cap
@@ -59,6 +70,40 @@ class CommissionEntry(Document):
 
 		# Backward compat
 		self.manager_commission_amount = flt(self.base_amount) * flt(self.manager_commission_pct) / 100
+
+		# Validate status transition
+		if not self.is_new():
+			self._validate_status_transition(settings)
+
+	def _validate_status_transition(self, settings):
+		"""Ensure only valid status transitions are allowed."""
+		old_status = self.get_db_value("status")
+		new_status = self.status
+
+		if old_status == new_status:
+			return  # No change
+
+		if not old_status:
+			return  # New document
+
+		allowed = VALID_TRANSITIONS.get(old_status, [])
+		if new_status not in allowed:
+			frappe.throw(
+				_("Invalid status transition: {0} → {1}. Allowed transitions from {0}: {2}").format(
+					old_status, new_status, ", ".join(allowed) or "None"
+				)
+			)
+
+		# Enforce approval workflow: block Pending → Paid if approval is enabled
+		if (
+			old_status == "Pending"
+			and new_status == "Paid"
+			and settings.enable_approval_workflow
+		):
+			frappe.throw(
+				_("This commission must be Approved before it can be marked as Paid. "
+				  "Approval workflow is enabled in Commission Settings.")
+			)
 
 	def on_update(self):
 		"""Handle status transitions."""
@@ -78,13 +123,6 @@ class CommissionEntry(Document):
 	def _on_paid(self):
 		"""Auto-create journal entry and send notification."""
 		settings = frappe.get_cached_doc("Commission Settings")
-
-		# If approval workflow is enabled, only allow Paid from Approved
-		if settings.enable_approval_workflow and not self.approved_by:
-			frappe.throw(
-				_("This commission must be Approved before it can be marked as Paid. "
-				  "Enable approval workflow is on in Commission Settings.")
-			)
 
 		if (
 			settings.auto_create_journal_entry
@@ -366,7 +404,7 @@ def _insert_commission_entry(doc, sales_person, pct, base_amount,
 
 def _create_reversal_entries(doc, settings):
 	"""
-	For credit notes (is_return=1): find original invoice's paid commission
+	For credit notes (is_return=1): find original invoice's commission
 	entries and create negative reversal entries.
 	"""
 	original_invoice = doc.return_against
@@ -544,4 +582,3 @@ def _get_tiered_rate(settings, sales_person, invoice_amount, posting_date):
 			return flt(tier.commission_pct)
 
 	return None
-

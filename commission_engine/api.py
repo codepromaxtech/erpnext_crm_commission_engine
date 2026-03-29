@@ -63,7 +63,7 @@ def get_commission_dashboard(company=None):
 		filters=filters,
 		fields=[
 			"name", "status", "commission_type", "commission_amount",
-			"manager_commission_amount", "base_amount", "commission_month",
+			"commission_role", "base_amount", "commission_month",
 			"sales_person", "sales_person_name", "manager", "manager_name",
 		],
 	)
@@ -74,26 +74,26 @@ def get_commission_dashboard(company=None):
 	last_month_end = get_last_day(add_months(today, -1))
 
 	# Summary totals
-	total_commission = sum(flt(e.commission_amount) + flt(e.manager_commission_amount) for e in entries)
+	total_commission = sum(flt(e.commission_amount) for e in entries)
 	total_pending = sum(
-		flt(e.commission_amount) + flt(e.manager_commission_amount)
+		flt(e.commission_amount)
 		for e in entries if e.status == "Pending"
 	)
 	total_paid = sum(
-		flt(e.commission_amount) + flt(e.manager_commission_amount)
+		flt(e.commission_amount)
 		for e in entries if e.status == "Paid"
 	)
 
 	# This month
 	this_month_entries = [e for e in entries if e.commission_month and getdate(e.commission_month) >= this_month_start]
-	this_month_total = sum(flt(e.commission_amount) + flt(e.manager_commission_amount) for e in this_month_entries)
+	this_month_total = sum(flt(e.commission_amount) for e in this_month_entries)
 
 	# Last month
 	last_month_entries = [
 		e for e in entries
 		if e.commission_month and last_month_start <= getdate(e.commission_month) <= last_month_end
 	]
-	last_month_total = sum(flt(e.commission_amount) + flt(e.manager_commission_amount) for e in last_month_entries)
+	last_month_total = sum(flt(e.commission_amount) for e in last_month_entries)
 
 	# Top 5 salespersons
 	sp_totals = {}
@@ -107,17 +107,17 @@ def get_commission_dashboard(company=None):
 	for e in entries:
 		if e.commission_month:
 			month_key = str(get_first_day(getdate(e.commission_month)))
-			monthly_trend[month_key] = monthly_trend.get(month_key, 0) + flt(e.commission_amount) + flt(e.manager_commission_amount)
+			monthly_trend[month_key] = monthly_trend.get(month_key, 0) + flt(e.commission_amount)
 
 	sorted_months = sorted(monthly_trend.items())[-6:]
 
 	# One-Time vs Recurring split
 	onetime_total = sum(
-		flt(e.commission_amount) + flt(e.manager_commission_amount)
+		flt(e.commission_amount)
 		for e in entries if e.commission_type == "One-Time"
 	)
 	recurring_total = sum(
-		flt(e.commission_amount) + flt(e.manager_commission_amount)
+		flt(e.commission_amount)
 		for e in entries if e.commission_type == "Recurring"
 	)
 
