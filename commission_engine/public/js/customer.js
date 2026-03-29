@@ -3,6 +3,13 @@
 // Shows full commission breakdown: Salesperson + Manager
 
 frappe.ui.form.on("Customer", {
+    refresh(frm) {
+        if (!frm.is_new()) {
+            frm.trigger("show_protection_banner");
+            frm.trigger("show_family_info");
+        }
+    },
+
     onload(frm) {
         // Only for new (unsaved) customers created from a lead
         if (frm.doc.__islocal && frm.doc.lead_name && (!frm.doc.sales_team || frm.doc.sales_team.length === 0)) {
@@ -87,6 +94,57 @@ frappe.ui.form.on("Customer", {
                 indicator: "green",
                 wide: true,
             });
+        });
+    },
+
+    show_protection_banner(frm) {
+        const sales_team = frm.doc.sales_team || [];
+        if (!sales_team.length) return;
+
+        const user_roles = frappe.user_roles || [];
+        const is_privileged = user_roles.includes("System Manager") ||
+            user_roles.includes("Accounts Manager") ||
+            user_roles.includes("Administrator");
+
+        if (!is_privileged) {
+            const persons = sales_team.map(r => r.sales_person).filter(Boolean).join(", ");
+            frm.dashboard.add_comment(
+                __("🔒 Sales Person assignment <b>{0}</b> is protected. Only their manager or a System Manager can reassign this customer.", [persons]),
+                "blue",
+                true
+            );
+        }
+    },
+
+    show_family_info(frm) {
+        // Check if this customer belongs to any family
+        frappe.xcall("frappe.client.get_list", {
+            doctype: "Customer Relation",
+            filters: [
+                ["parenttype", "=", "Customer Family"],
+                ["customer", "=", frm.doc.name]
+            ],
+            fields: ["parent", "relation_type"],
+            limit_page_length: 5
+        }).then(relations => {
+            if (!relations || !relations.length) return;
+
+            let html = `<div style="margin:8px 0;">
+                <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+                    <span style="font-size:14px;">👨‍👩‍👧‍👦</span>
+                    <span style="font-weight:700; font-size:13px;">Customer Families</span>
+                </div>`;
+
+            relations.forEach(r => {
+                html += `<div style="margin-left:24px;">
+                    <a href="/app/customer-family/${r.parent}" style="font-weight:600;">${r.parent}</a>
+                    <span style="color:#9ca3af; font-size:11px; margin-left:4px;">(${r.relation_type})</span>
+                </div>`;
+            });
+            html += `</div>`;
+            frm.dashboard.add_section(html, __("Family"));
+        }).catch(() => {
+            // Customer Family doctype may not exist yet — silently ignore
         });
     },
 });

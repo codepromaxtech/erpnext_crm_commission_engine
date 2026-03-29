@@ -145,6 +145,7 @@ doc_events = {
 	},
 	"Customer": {
 		"before_insert": "commission_engine.customer_hooks.auto_set_sales_person",
+		"validate": "commission_engine.customer_hooks.protect_sales_person_assignment",
 	},
 }
 

@@ -148,3 +148,107 @@ def _resolve_sales_person(user_email):
 			return sales_person
 
 	return None
+
+
+def protect_sales_person_assignment(doc, method=None):
+	"""
+	On Customer.validate — prevent Sales Users from changing the sales_team
+	assignment. Only managers in the hierarchy (or System/Accounts Manager)
+	can reassign a customer's sales person.
+
+	This prevents lead/customer "stealing" between salespeople.
+	"""
+	if doc.is_new():
+		return
+
+	# Privileged roles can always change
+	user_roles = frappe.get_roles(frappe.session.user)
+	privileged_roles = {"System Manager", "Accounts Manager", "Administrator"}
+	if privileged_roles & set(user_roles):
+		return
+
+	# Get current DB state of sales_team
+	old_sales_persons = set(
+		frappe.db.get_all(
+			"Sales Team",
+			filters={"parenttype": "Customer", "parent": doc.name},
+			pluck="sales_person",
+		)
+	)
+
+	if not old_sales_persons:
+		return  # No existing assignment to protect
+
+	# Get new sales_team from the form
+	new_sales_persons = set(
+		row.sales_person for row in (doc.get("sales_team") or []) if row.sales_person
+	)
+
+	# Check for removed or changed sales persons
+	removed = old_sales_persons - new_sales_persons
+	added = new_sales_persons - old_sales_persons
+
+	if not removed and not added:
+		return  # No changes to protect
+
+	# Resolve the current user to their Sales Person
+	user_sp = _resolve_sales_person(frappe.session.user)
+
+	# For each removed sales person, verify the current user is a manager
+	for old_sp in removed:
+		if not _is_manager_of(user_sp, old_sp):
+			frappe.throw(
+				frappe._(
+					"You cannot remove <b>{0}</b> from this customer's sales team. "
+					"Only their manager or a System Manager can reassign customers."
+				).format(old_sp),
+				title=frappe._("Sales Person Protected"),
+			)
+
+	# If a sales person was replaced, also verify for the original
+	if removed and added:
+		for old_sp in removed:
+			if not _is_manager_of(user_sp, old_sp):
+				frappe.throw(
+					frappe._(
+						"You cannot reassign this customer from <b>{0}</b>. "
+						"Only their manager or a System Manager can make this change."
+					).format(old_sp),
+					title=frappe._("Sales Person Protected"),
+				)
+
+
+def _is_manager_of(manager_sp, subordinate_sp):
+	"""
+	Check if manager_sp is an ancestor of subordinate_sp in the Sales Person tree.
+	Uses the nested set model (lft/rgt) for efficient ancestor checking.
+	"""
+	if not manager_sp or not subordinate_sp:
+		return False
+
+	if manager_sp == subordinate_sp:
+		return True  # Same person
+
+	# Use nested set: manager's lft < subordinate's lft < subordinate's rgt < manager's rgt
+	mgr_lft, mgr_rgt = frappe.db.get_value(
+		"Sales Person", manager_sp, ["lft", "rgt"]
+	) or (0, 0)
+	sub_lft, sub_rgt = frappe.db.get_value(
+		"Sales Person", subordinate_sp, ["lft", "rgt"]
+	) or (0, 0)
+
+	if mgr_lft and sub_lft:
+		return mgr_lft < sub_lft and sub_rgt < mgr_rgt
+
+	# Fallback: walk up the tree manually
+	current = subordinate_sp
+	for _ in range(10):  # Safety limit
+		parent = frappe.db.get_value("Sales Person", current, "parent_sales_person")
+		if not parent or parent == current:
+			return False
+		if parent == manager_sp:
+			return True
+		current = parent
+
+	return False
+

@@ -1,0 +1,147 @@
+{
+    "actions": [],
+    "autoname": "CF-.#####",
+    "creation": "2026-03-29 00:00:00",
+    "doctype": "DocType",
+    "document_type": "Document",
+    "engine": "InnoDB",
+    "field_order": [
+        "family_section",
+        "family_name",
+        "primary_customer",
+        "col_break1",
+        "family_status",
+        "members_section",
+        "members",
+        "notes_section",
+        "notes"
+    ],
+    "fields": [
+        {
+            "fieldname": "family_section",
+            "fieldtype": "Section Break",
+            "label": "Family Details"
+        },
+        {
+            "fieldname": "family_name",
+            "fieldtype": "Data",
+            "label": "Family Name",
+            "reqd": 1,
+            "in_list_view": 1,
+            "in_standard_filter": 1,
+            "unique": 1,
+            "description": "A descriptive name for this family group (e.g. 'The Smith Family' or 'Acme Corp Group')"
+        },
+        {
+            "fieldname": "primary_customer",
+            "fieldtype": "Link",
+            "label": "Primary Customer",
+            "options": "Customer",
+            "in_list_view": 1,
+            "description": "The main/head customer of this family"
+        },
+        {
+            "fieldname": "col_break1",
+            "fieldtype": "Column Break"
+        },
+        {
+            "default": "Active",
+            "fieldname": "family_status",
+            "fieldtype": "Select",
+            "label": "Status",
+            "options": "Active\nInactive",
+            "in_list_view": 1,
+            "in_standard_filter": 1
+        },
+        {
+            "fieldname": "members_section",
+            "fieldtype": "Section Break",
+            "label": "Family Members"
+        },
+        {
+            "fieldname": "members",
+            "fieldtype": "Table",
+            "label": "Members",
+            "options": "Customer Relation",
+            "reqd": 1,
+            "description": "Add customers and their relationships within this family"
+        },
+        {
+            "fieldname": "notes_section",
+            "fieldtype": "Section Break",
+            "label": "Notes",
+            "collapsible": 1
+        },
+        {
+            "fieldname": "notes",
+            "fieldtype": "Small Text",
+            "label": "Notes"
+        }
+    ],
+    "links": [
+        {
+            "group": "Commission",
+            "link_doctype": "Commission Entry",
+            "link_fieldname": "customer"
+        }
+    ],
+    "modified": "2026-03-29 00:00:00",
+    "modified_by": "Administrator",
+    "module": "Commission Engine",
+    "name": "Customer Family",
+    "naming_rule": "Expression (old style)",
+    "owner": "Administrator",
+    "permissions": [
+        {
+            "create": 1,
+            "delete": 1,
+            "email": 1,
+            "export": 1,
+            "print": 1,
+            "read": 1,
+            "report": 1,
+            "role": "System Manager",
+            "share": 1,
+            "write": 1
+        },
+        {
+            "create": 1,
+            "delete": 0,
+            "email": 1,
+            "print": 1,
+            "read": 1,
+            "report": 1,
+            "role": "Sales Manager",
+            "share": 1,
+            "write": 1
+        },
+        {
+            "create": 1,
+            "delete": 0,
+            "email": 1,
+            "print": 1,
+            "read": 1,
+            "report": 1,
+            "role": "Sales User",
+            "share": 0,
+            "write": 1
+        },
+        {
+            "create": 0,
+            "delete": 0,
+            "email": 1,
+            "print": 1,
+            "read": 1,
+            "report": 1,
+            "role": "Accounts Manager",
+            "share": 0,
+            "write": 0
+        }
+    ],
+    "sort_field": "modified",
+    "sort_order": "DESC",
+    "states": [],
+    "title_field": "family_name",
+    "show_title_field_in_link": 1,
+    "track_changes": 1
+}
