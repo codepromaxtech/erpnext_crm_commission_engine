@@ -1,0 +1,114 @@
+{
+    "actions": [],
+    "autoname": "format:CP-{period_month}",
+    "creation": "2026-03-29 00:00:00",
+    "doctype": "DocType",
+    "document_type": "Document",
+    "engine": "InnoDB",
+    "field_order": [
+        "period_month",
+        "period_status",
+        "col_break1",
+        "locked_by",
+        "locked_date",
+        "summary_section",
+        "total_entries",
+        "total_commission",
+        "total_paid"
+    ],
+    "fields": [
+        {
+            "fieldname": "period_month",
+            "fieldtype": "Date",
+            "label": "Period Month",
+            "reqd": 1,
+            "unique": 1,
+            "in_list_view": 1,
+            "description": "First day of the month (e.g., 2026-03-01)"
+        },
+        {
+            "default": "Open",
+            "fieldname": "period_status",
+            "fieldtype": "Select",
+            "label": "Status",
+            "options": "Open\nLocked",
+            "reqd": 1,
+            "in_list_view": 1,
+            "in_standard_filter": 1
+        },
+        {
+            "fieldname": "col_break1",
+            "fieldtype": "Column Break"
+        },
+        {
+            "fieldname": "locked_by",
+            "fieldtype": "Link",
+            "label": "Locked By",
+            "options": "User",
+            "read_only": 1
+        },
+        {
+            "fieldname": "locked_date",
+            "fieldtype": "Datetime",
+            "label": "Locked Date",
+            "read_only": 1
+        },
+        {
+            "fieldname": "summary_section",
+            "fieldtype": "Section Break",
+            "label": "Period Summary"
+        },
+        {
+            "fieldname": "total_entries",
+            "fieldtype": "Int",
+            "label": "Total Entries",
+            "read_only": 1
+        },
+        {
+            "fieldname": "total_commission",
+            "fieldtype": "Currency",
+            "label": "Total Commission",
+            "read_only": 1
+        },
+        {
+            "fieldname": "total_paid",
+            "fieldtype": "Currency",
+            "label": "Total Paid",
+            "read_only": 1
+        }
+    ],
+    "links": [],
+    "modified": "2026-03-29 00:00:00",
+    "modified_by": "Administrator",
+    "module": "Commission Engine",
+    "name": "Commission Period",
+    "naming_rule": "Expression (old style)",
+    "owner": "Administrator",
+    "permissions": [
+        {
+            "create": 1,
+            "delete": 0,
+            "read": 1,
+            "role": "System Manager",
+            "write": 1
+        },
+        {
+            "create": 0,
+            "delete": 0,
+            "read": 1,
+            "role": "Accounts User",
+            "write": 1
+        },
+        {
+            "create": 0,
+            "delete": 0,
+            "read": 1,
+            "role": "Sales Manager",
+            "write": 0
+        }
+    ],
+    "sort_field": "period_month",
+    "sort_order": "DESC",
+    "states": [],
+    "track_changes": 1
+}

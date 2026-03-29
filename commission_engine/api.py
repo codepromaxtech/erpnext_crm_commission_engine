@@ -8,7 +8,31 @@ from frappe.utils import flt, getdate, get_first_day, get_last_day, add_months, 
 
 @frappe.whitelist()
 def bulk_mark_as_paid(names):
-	"""Mark multiple Commission Entries as Paid at once."""
+	"""Mark multiple Commission Entries as Paid."""
+	import json
+	if isinstance(names, str):
+		names = json.loads(names)
+
+	settings = frappe.get_cached_doc("Commission Settings")
+	count = 0
+	for name in names:
+		doc = frappe.get_doc("Commission Entry", name)
+		# Allow Pending→Paid only if approval is disabled, or already Approved
+		if doc.status in ("Pending", "Approved"):
+			if doc.status == "Pending" and settings.enable_approval_workflow:
+				continue  # Must be approved first
+			doc.status = "Paid"
+			doc.flags.ignore_permissions = True
+			doc.save()
+			count += 1
+
+	frappe.db.commit()
+	return {"message": _("{0} commission entries marked as Paid").format(count), "count": count}
+
+
+@frappe.whitelist()
+def bulk_approve(names):
+	"""Approve multiple Pending Commission Entries."""
 	import json
 	if isinstance(names, str):
 		names = json.loads(names)
@@ -17,13 +41,14 @@ def bulk_mark_as_paid(names):
 	for name in names:
 		doc = frappe.get_doc("Commission Entry", name)
 		if doc.status == "Pending":
-			doc.status = "Paid"
+			doc.status = "Approved"
 			doc.flags.ignore_permissions = True
 			doc.save()
 			count += 1
 
 	frappe.db.commit()
-	return {"message": _("{0} commission entries marked as Paid").format(count), "count": count}
+	return {"message": _("{0} commission entries approved").format(count), "count": count}
+
 
 
 @frappe.whitelist()

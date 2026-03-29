@@ -4,7 +4,7 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import flt, getdate, get_first_day
+from frappe.utils import flt, getdate, get_first_day, nowdate, now
 
 
 class CommissionEntry(Document):
@@ -14,6 +14,8 @@ class CommissionEntry(Document):
 	if TYPE_CHECKING:
 		from frappe.types import DF
 
+		approval_date: DF.Datetime | None
+		approved_by: DF.Link | None
 		base_amount: DF.Currency
 		commission_amount: DF.Currency
 		commission_month: DF.Date
@@ -28,82 +30,132 @@ class CommissionEntry(Document):
 		manager_commission_amount: DF.Currency
 		manager_commission_pct: DF.Percent
 		manager_name: DF.Data | None
+		original_entry: DF.Link | None
+		reversed_entry: DF.Link | None
 		sales_invoice: DF.Link
 		sales_person: DF.Link
 		sales_person_name: DF.Data | None
-		status: DF.Literal["Pending", "Paid", "Cancelled"]
+		status: DF.Literal["Pending", "Approved", "Paid", "Cancelled", "Reversed"]
 		subscription: DF.Link | None
 	# end: auto-generated types
 
 	def validate(self):
+		# Check if the period is locked
+		if self.commission_month and not self.flags.ignore_period_lock:
+			from commission_engine.commission_engine.doctype.commission_period.commission_period import is_period_locked
+			if is_period_locked(self.commission_month):
+				frappe.throw(
+					_("Commission period {0} is locked. No modifications allowed.").format(
+						self.commission_month)
+				)
+
 		self.commission_amount = flt(self.base_amount) * flt(self.commission_pct) / 100
-		# Keep manager_commission_amount for backward compat, but new entries set it to 0
+
+		# Apply maximum cap
+		settings = frappe.get_cached_doc("Commission Settings")
+		cap = flt(settings.maximum_commission_cap)
+		if cap > 0 and flt(self.commission_amount) > cap:
+			self.commission_amount = cap
+
+		# Backward compat
 		self.manager_commission_amount = flt(self.base_amount) * flt(self.manager_commission_pct) / 100
 
 	def on_update(self):
-		"""Auto-create journal entry and notify when status changes to Paid."""
-		if self.status == "Paid" and self.has_value_changed("status"):
-			settings = frappe.get_cached_doc("Commission Settings")
-			if (
-				settings.auto_create_journal_entry
-				and not self.journal_entry
-				and settings.commission_expense_account
-				and settings.commission_payable_account
-			):
-				self._create_journal_entry(settings)
+		"""Handle status transitions."""
+		if not self.has_value_changed("status"):
+			return
 
-			self._send_paid_notification()
+		if self.status == "Approved":
+			self._on_approved()
+		elif self.status == "Paid":
+			self._on_paid()
+
+	def _on_approved(self):
+		"""Record who approved and when."""
+		self.db_set("approved_by", frappe.session.user)
+		self.db_set("approval_date", now())
+
+	def _on_paid(self):
+		"""Auto-create journal entry and send notification."""
+		settings = frappe.get_cached_doc("Commission Settings")
+
+		# If approval workflow is enabled, only allow Paid from Approved
+		if settings.enable_approval_workflow and not self.approved_by:
+			frappe.throw(
+				_("This commission must be Approved before it can be marked as Paid. "
+				  "Enable approval workflow is on in Commission Settings.")
+			)
+
+		if (
+			settings.auto_create_journal_entry
+			and not self.journal_entry
+			and settings.commission_expense_account
+			and settings.commission_payable_account
+		):
+			self._create_journal_entry(settings)
+
+		self._send_paid_notification()
 
 	def _create_journal_entry(self, settings):
-		# Each entry now represents ONE person — use their commission_amount only
 		amount = flt(self.commission_amount)
 		if not amount:
 			return
 
 		role_label = self.commission_role or "Salesperson"
 		payee = self.sales_person_name or self.sales_person
+		is_reversal = flt(amount) < 0
 
 		je = frappe.new_doc("Journal Entry")
 		je.voucher_type = "Journal Entry"
 		je.company = self.company
-		je.posting_date = frappe.utils.today()
-		je.user_remark = _(
-			"Commission payment ({role}) for {person} — {entry} / {invoice}"
-		).format(
-			role=role_label,
-			person=payee,
-			entry=self.name,
-			invoice=self.sales_invoice,
-		)
+		je.posting_date = nowdate()
 
-		je.append("accounts", {
-			"account": settings.commission_expense_account,
-			"debit_in_account_currency": amount,
-			"credit_in_account_currency": 0,
-		})
-		je.append("accounts", {
-			"account": settings.commission_payable_account,
-			"debit_in_account_currency": 0,
-			"credit_in_account_currency": amount,
-		})
+		if is_reversal:
+			je.user_remark = _(
+				"Commission REVERSAL ({role}) for {person} — {entry} / {invoice}"
+			).format(role=role_label, person=payee, entry=self.name, invoice=self.sales_invoice)
+			# Reverse: credit expense, debit payable
+			je.append("accounts", {
+				"account": settings.commission_expense_account,
+				"debit_in_account_currency": 0,
+				"credit_in_account_currency": abs(amount),
+			})
+			je.append("accounts", {
+				"account": settings.commission_payable_account,
+				"debit_in_account_currency": abs(amount),
+				"credit_in_account_currency": 0,
+			})
+		else:
+			je.user_remark = _(
+				"Commission payment ({role}) for {person} — {entry} / {invoice}"
+			).format(role=role_label, person=payee, entry=self.name, invoice=self.sales_invoice)
+			je.append("accounts", {
+				"account": settings.commission_expense_account,
+				"debit_in_account_currency": amount,
+				"credit_in_account_currency": 0,
+			})
+			je.append("accounts", {
+				"account": settings.commission_payable_account,
+				"debit_in_account_currency": 0,
+				"credit_in_account_currency": amount,
+			})
 
 		je.flags.ignore_permissions = True
 		je.insert()
 		je.submit()
 
 		self.db_set("journal_entry", je.name)
+		action = "reversal" if is_reversal else "payment"
 		frappe.msgprint(
-			_("Journal Entry {0} created — {1} commission for {2}: {3}").format(
-				je.name, role_label, payee, frappe.utils.fmt_money(amount)
+			_("Journal Entry {0} created — {1} commission {2} for {3}: {4}").format(
+				je.name, role_label, action, payee, frappe.utils.fmt_money(abs(amount))
 			),
-			indicator="green",
+			indicator="green" if not is_reversal else "orange",
 		)
 
 	def _send_paid_notification(self):
 		"""Send email notification to the person when their commission is paid."""
 		recipients = []
-
-		# The sales_person field holds the payee (could be SP or Manager)
 		sp_employee = frappe.db.get_value("Sales Person", self.sales_person, "employee")
 		if sp_employee:
 			sp_email = (
@@ -120,43 +172,32 @@ class CommissionEntry(Document):
 		role_label = self.commission_role or "Salesperson"
 		payee = self.sales_person_name or self.sales_person
 		amount = flt(self.commission_amount)
-
 		subject = _("Commission Paid — {0} ({1})").format(self.name, role_label)
 		message = _(
 			"<p>Hello {person},</p>"
 			"<p>Your <b>{role}</b> commission has been marked as <b>Paid</b>.</p>"
 			"<table style='border-collapse:collapse; width:100%; max-width:500px;'>"
-			"<tr><td style='padding:6px; border:1px solid #ddd;'><b>Commission Entry</b></td>"
+			"<tr><td style='padding:6px; border:1px solid #ddd;'><b>Entry</b></td>"
 			"<td style='padding:6px; border:1px solid #ddd;'>{entry}</td></tr>"
-			"<tr><td style='padding:6px; border:1px solid #ddd;'><b>Role</b></td>"
-			"<td style='padding:6px; border:1px solid #ddd;'>{role}</td></tr>"
-			"<tr><td style='padding:6px; border:1px solid #ddd;'><b>Sales Invoice</b></td>"
+			"<tr><td style='padding:6px; border:1px solid #ddd;'><b>Invoice</b></td>"
 			"<td style='padding:6px; border:1px solid #ddd;'>{invoice}</td></tr>"
 			"<tr><td style='padding:6px; border:1px solid #ddd;'><b>Customer</b></td>"
 			"<td style='padding:6px; border:1px solid #ddd;'>{customer}</td></tr>"
-			"<tr><td style='padding:6px; border:1px solid #ddd;'><b>Rate</b></td>"
-			"<td style='padding:6px; border:1px solid #ddd;'>{pct}%</td></tr>"
 			"<tr style='background:#f0f4ff;'><td style='padding:6px; border:1px solid #ddd;'><b>Amount</b></td>"
 			"<td style='padding:6px; border:1px solid #ddd;'><b>{amount}</b></td></tr>"
 			"</table>"
 			"<p>Regards,<br>Commission Engine</p>"
 		).format(
-			person=payee,
-			role=role_label,
-			entry=self.name,
+			person=payee, role=role_label, entry=self.name,
 			invoice=self.sales_invoice,
 			customer=self.customer_name or self.customer,
-			pct=flt(self.commission_pct, 2),
 			amount=frappe.utils.fmt_money(amount),
 		)
 
 		try:
 			frappe.sendmail(
-				recipients=recipients,
-				subject=subject,
-				message=message,
-				reference_doctype="Commission Entry",
-				reference_name=self.name,
+				recipients=recipients, subject=subject, message=message,
+				reference_doctype="Commission Entry", reference_name=self.name,
 				now=False,
 			)
 		except Exception:
@@ -164,33 +205,43 @@ class CommissionEntry(Document):
 
 
 # ---------------------------------------------------------------------------
-# Hook called on Sales Invoice submit
+# Hooks on Sales Invoice
 # ---------------------------------------------------------------------------
 
 def create_commission_entries(doc, method=None):
 	"""
 	Triggered on Sales Invoice `on_submit`.
-	Creates separate Commission Entries for each Sales Person AND their Manager.
-	Each person gets their own independent entry that can be paid separately.
-	"""
-	if doc.is_return:
-		return  # No commission on credit notes
+	Creates separate Commission Entries for Salesperson AND Manager.
 
+	Handles:
+	- Normal invoices (positive amounts)
+	- Credit notes / returns (negative reversal entries)
+	- Amended invoices (cancel old entries, create new ones)
+	"""
 	settings = frappe.get_cached_doc("Commission Settings")
 	sales_team = doc.get("sales_team") or []
 
 	if not sales_team:
-		return  # No sales team tagged, skip silently
+		return
 
+	# --- Handle credit notes / returns ---
+	if doc.is_return:
+		_create_reversal_entries(doc, settings)
+		return
+
+	# --- Handle amended invoices ---
+	if doc.amended_from:
+		_cancel_entries_for_invoice(doc.amended_from)
+
+	# --- Normal invoice flow ---
 	for row in sales_team:
 		if not row.sales_person:
 			continue
 
-		# Determine if this is the customer's first invoice (one-time) or recurring
 		is_first = _is_first_invoice(doc.customer, doc.name)
 		commission_type = "One-Time" if is_first else "Recurring"
 
-		# Pick global default rates from settings
+		# Global default rates
 		if is_first:
 			sp_pct = flt(settings.onetime_salesperson_pct)
 			mgr_pct = flt(settings.onetime_manager_pct)
@@ -198,78 +249,57 @@ def create_commission_entries(doc, method=None):
 			sp_pct = flt(settings.recurring_salesperson_pct)
 			mgr_pct = flt(settings.recurring_manager_pct)
 
-		# Check for individual override for this salesperson
+		# Per-person overrides
 		sp_pct = _get_override_rate(settings, row.sales_person, "Salesperson", is_first, sp_pct)
 
-		# Base amount = the allocated amount for this sales person on the invoice
 		base_amount = flt(row.allocated_amount) or flt(doc.base_net_total)
 
-		# Find manager via Sales Person tree (parent_sales_person)
-		manager = frappe.db.get_value(
-			"Sales Person", row.sales_person, "parent_sales_person"
-		)
-		# Exclude tree root ("All Sales Persons") as manager
+		# Find manager via Sales Person tree
+		manager = frappe.db.get_value("Sales Person", row.sales_person, "parent_sales_person")
 		if manager:
-			root = frappe.db.get_value(
-				"Sales Person", {"is_group": 1, "parent_sales_person": ""}, "name"
-			)
+			root = frappe.db.get_value("Sales Person", {"is_group": 1, "parent_sales_person": ""}, "name")
 			if manager == root:
 				manager = None
 
-		# Check for individual override for this manager
 		if manager:
 			mgr_pct = _get_override_rate(settings, manager, "Manager", is_first, mgr_pct)
 
-		# ---- ENTRY 1: Salesperson Commission ----
-		existing_sp = frappe.db.exists("Commission Entry", {
-			"sales_invoice": doc.name,
-			"sales_person": row.sales_person,
-			"commission_role": "Salesperson",
-		})
-		if not existing_sp:
-			sp_entry = frappe.new_doc("Commission Entry")
-			sp_entry.update({
-				"sales_invoice": doc.name,
-				"company": doc.company,
-				"customer": doc.customer,
-				"commission_type": commission_type,
-				"commission_role": "Salesperson",
-				"commission_month": get_first_day(getdate(doc.posting_date)),
-				"sales_person": row.sales_person,
-				"commission_pct": sp_pct,
-				"base_amount": base_amount,
-				"manager": manager,
-				"manager_commission_pct": 0,
-				"status": "Pending",
-			})
-			sp_entry.flags.ignore_permissions = True
-			sp_entry.insert()
+		# --- Create Salesperson Entry ---
+		sp_amount = flt(base_amount) * flt(sp_pct) / 100
+		cap = flt(settings.maximum_commission_cap)
+		if cap > 0 and sp_amount > cap:
+			sp_amount = cap
 
-		# ---- ENTRY 2: Manager Commission (if manager exists and has rate) ----
-		if manager and mgr_pct:
-			existing_mgr = frappe.db.exists("Commission Entry", {
+		min_threshold = flt(settings.minimum_commission_threshold)
+		if min_threshold > 0 and sp_amount < min_threshold:
+			pass  # Skip — below minimum
+		else:
+			existing = frappe.db.exists("Commission Entry", {
 				"sales_invoice": doc.name,
-				"sales_person": manager,
-				"commission_role": "Manager",
+				"sales_person": row.sales_person,
+				"commission_role": "Salesperson",
 			})
-			if not existing_mgr:
-				mgr_entry = frappe.new_doc("Commission Entry")
-				mgr_entry.update({
+			if not existing:
+				_insert_commission_entry(doc, row.sales_person, sp_pct, base_amount,
+					commission_type, "Salesperson", manager)
+
+		# --- Create Manager Entry ---
+		if manager and mgr_pct:
+			mgr_amount = flt(base_amount) * flt(mgr_pct) / 100
+			if cap > 0 and mgr_amount > cap:
+				mgr_amount = cap
+
+			if min_threshold > 0 and mgr_amount < min_threshold:
+				pass  # Skip — below minimum
+			else:
+				existing = frappe.db.exists("Commission Entry", {
 					"sales_invoice": doc.name,
-					"company": doc.company,
-					"customer": doc.customer,
-					"commission_type": commission_type,
+					"sales_person": manager,
 					"commission_role": "Manager",
-					"commission_month": get_first_day(getdate(doc.posting_date)),
-					"sales_person": manager,  # Manager is the payee
-					"commission_pct": mgr_pct,
-					"base_amount": base_amount,
-					"manager": None,
-					"manager_commission_pct": 0,
-					"status": "Pending",
 				})
-				mgr_entry.flags.ignore_permissions = True
-				mgr_entry.insert()
+				if not existing:
+					_insert_commission_entry(doc, manager, mgr_pct, base_amount,
+						commission_type, "Manager", None)
 
 	frappe.db.commit()
 
@@ -277,23 +307,174 @@ def create_commission_entries(doc, method=None):
 def cancel_commission_entries(doc, method=None):
 	"""
 	Triggered on Sales Invoice `on_cancel`.
-	Cancels all Pending Commission Entries linked to this invoice.
+	- Pending/Approved entries → set to Cancelled
+	- Paid entries → create REVERSAL (clawback) entries with negative amounts + reversal JE
 	"""
 	entries = frappe.get_all(
 		"Commission Entry",
-		filters={"sales_invoice": doc.name, "status": ["!=", "Paid"]},
-		pluck="name",
+		filters={"sales_invoice": doc.name, "status": ["not in", ["Cancelled", "Reversed"]]},
+		fields=["name", "status", "sales_person", "commission_pct", "base_amount",
+		        "commission_role", "commission_type", "company", "customer",
+		        "commission_month", "manager", "commission_amount"],
 	)
-	for name in entries:
-		frappe.db.set_value("Commission Entry", name, "status", "Cancelled")
+
+	settings = frappe.get_cached_doc("Commission Settings")
+
+	for entry in entries:
+		if entry.status in ("Pending", "Approved"):
+			# Simply cancel
+			frappe.db.set_value("Commission Entry", entry.name, "status", "Cancelled")
+		elif entry.status == "Paid":
+			# CLAWBACK: Create reversal entry with negative amount
+			_create_clawback_entry(entry, settings)
 
 	if entries:
 		frappe.db.commit()
 
 
 # ---------------------------------------------------------------------------
-# Helper
+# Helpers
 # ---------------------------------------------------------------------------
+
+def _insert_commission_entry(doc, sales_person, pct, base_amount,
+                             commission_type, role, manager):
+	"""Create and insert a single Commission Entry."""
+	entry = frappe.new_doc("Commission Entry")
+	entry.update({
+		"sales_invoice": doc.name,
+		"company": doc.company,
+		"customer": doc.customer,
+		"commission_type": commission_type,
+		"commission_role": role,
+		"commission_month": get_first_day(getdate(doc.posting_date)),
+		"sales_person": sales_person,
+		"commission_pct": pct,
+		"base_amount": base_amount,
+		"manager": manager,
+		"manager_commission_pct": 0,
+		"status": "Pending",
+	})
+	entry.flags.ignore_permissions = True
+	entry.insert()
+	return entry.name
+
+
+def _create_reversal_entries(doc, settings):
+	"""
+	For credit notes (is_return=1): find original invoice's paid commission
+	entries and create negative reversal entries.
+	"""
+	original_invoice = doc.return_against
+	if not original_invoice:
+		return
+
+	original_entries = frappe.get_all(
+		"Commission Entry",
+		filters={
+			"sales_invoice": original_invoice,
+			"status": ["in", ["Pending", "Approved", "Paid"]],
+			"reversed_entry": ["is", "not set"],
+		},
+		fields=["name", "sales_person", "commission_pct", "base_amount",
+		        "commission_role", "commission_type", "company", "customer",
+		        "commission_month", "manager", "commission_amount"],
+	)
+
+	for orig in original_entries:
+		# Check if already reversed
+		already_reversed = frappe.db.exists("Commission Entry", {
+			"original_entry": orig.name,
+		})
+		if already_reversed:
+			continue
+
+		# Create negative reversal entry
+		reversal = frappe.new_doc("Commission Entry")
+		reversal.update({
+			"sales_invoice": doc.name,  # Link to the credit note
+			"company": orig.company,
+			"customer": orig.customer,
+			"commission_type": orig.commission_type,
+			"commission_role": orig.commission_role,
+			"commission_month": get_first_day(getdate(doc.posting_date)),
+			"sales_person": orig.sales_person,
+			"commission_pct": orig.commission_pct,
+			"base_amount": -abs(flt(orig.base_amount)),  # Negative
+			"manager": orig.manager,
+			"manager_commission_pct": 0,
+			"original_entry": orig.name,
+			"status": "Pending",
+		})
+		reversal.flags.ignore_permissions = True
+		reversal.insert()
+
+		# Mark original as reversed
+		frappe.db.set_value("Commission Entry", orig.name, {
+			"status": "Reversed",
+			"reversed_entry": reversal.name,
+		})
+
+	frappe.db.commit()
+
+
+def _create_clawback_entry(entry, settings):
+	"""
+	For invoice cancellation when commission already paid:
+	Create a reversal entry with negative amount and auto-create reversal JE.
+	"""
+	reversal = frappe.new_doc("Commission Entry")
+	reversal.update({
+		"sales_invoice": entry.name.split("-")[0] if "-" in str(entry.name) else "",  # Keep reference
+		"sales_invoice": frappe.db.get_value("Commission Entry", entry.name, "sales_invoice"),
+		"company": entry.company,
+		"customer": entry.customer,
+		"commission_type": entry.commission_type,
+		"commission_role": entry.commission_role,
+		"commission_month": get_first_day(getdate()),
+		"sales_person": entry.sales_person,
+		"commission_pct": entry.commission_pct,
+		"base_amount": -abs(flt(entry.base_amount)),
+		"manager": entry.manager,
+		"manager_commission_pct": 0,
+		"original_entry": entry.name,
+		"status": "Paid",  # Auto-paid since it's a clawback
+	})
+	reversal.flags.ignore_permissions = True
+	reversal.insert()
+
+	# Auto-create reversal JE
+	if (
+		settings.auto_create_journal_entry
+		and settings.commission_expense_account
+		and settings.commission_payable_account
+	):
+		reversal_doc = frappe.get_doc("Commission Entry", reversal.name)
+		reversal_doc._create_journal_entry(settings)
+
+	# Mark original as reversed
+	frappe.db.set_value("Commission Entry", entry.name, {
+		"status": "Reversed",
+		"reversed_entry": reversal.name,
+	})
+
+	frappe.msgprint(
+		_("Clawback: Reversal entry {0} created for paid commission {1}").format(
+			reversal.name, entry.name
+		),
+		indicator="orange",
+	)
+
+
+def _cancel_entries_for_invoice(invoice_name):
+	"""Cancel all non-paid entries for an invoice (used when invoice is amended)."""
+	entries = frappe.get_all(
+		"Commission Entry",
+		filters={"sales_invoice": invoice_name, "status": ["in", ["Pending", "Approved"]]},
+		pluck="name",
+	)
+	for name in entries:
+		frappe.db.set_value("Commission Entry", name, "status", "Cancelled")
+
 
 def _is_first_invoice(customer, current_invoice_name):
 	count = frappe.db.count(

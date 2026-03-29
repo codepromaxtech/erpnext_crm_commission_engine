@@ -30,7 +30,13 @@
         "manager_commission_pct",
         "manager_commission_amount",
         "accounting_section",
-        "journal_entry"
+        "journal_entry",
+        "approval_section",
+        "approved_by",
+        "approval_date",
+        "col_break3",
+        "reversed_entry",
+        "original_entry"
     ],
     "fields": [
         {
@@ -122,7 +128,7 @@
             "fieldname": "status",
             "fieldtype": "Select",
             "label": "Status",
-            "options": "Pending\nPaid\nCancelled",
+            "options": "Pending\nApproved\nPaid\nCancelled\nReversed",
             "reqd": 1,
             "in_list_view": 1,
             "in_standard_filter": 1
@@ -207,6 +213,45 @@
             "label": "Journal Entry",
             "options": "Journal Entry",
             "read_only": 1
+        },
+        {
+            "fieldname": "approval_section",
+            "fieldtype": "Section Break",
+            "label": "Approval & Reversal",
+            "collapsible": 1
+        },
+        {
+            "fieldname": "approved_by",
+            "fieldtype": "Link",
+            "label": "Approved By",
+            "options": "User",
+            "read_only": 1
+        },
+        {
+            "fieldname": "approval_date",
+            "fieldtype": "Datetime",
+            "label": "Approval Date",
+            "read_only": 1
+        },
+        {
+            "fieldname": "col_break3",
+            "fieldtype": "Column Break"
+        },
+        {
+            "fieldname": "reversed_entry",
+            "fieldtype": "Link",
+            "label": "Reversed By Entry",
+            "options": "Commission Entry",
+            "read_only": 1,
+            "description": "The reversal entry that cancelled this commission"
+        },
+        {
+            "fieldname": "original_entry",
+            "fieldtype": "Link",
+            "label": "Reversal Of",
+            "options": "Commission Entry",
+            "read_only": 1,
+            "description": "The original entry this reversal is for"
         }
     ],
     "links": [
