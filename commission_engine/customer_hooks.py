@@ -252,3 +252,42 @@ def _is_manager_of(manager_sp, subordinate_sp):
 
 	return False
 
+
+def apply_family_discount(doc, method=None):
+	"""
+	On Sales Invoice validate: If the customer belongs to a Customer Family
+	that has a family_discount_pct > 0, automatically apply it to the
+	invoice's additional_discount_percentage if no discount is currently set.
+	"""
+	from frappe.utils import flt
+	
+	if not doc.customer:
+		return
+
+	# Only auto-apply if the user hasn't manually set a discount
+	if flt(doc.additional_discount_percentage) > 0:
+		return
+
+	# Find if customer belongs to a Family
+	relations = frappe.get_all(
+		"Customer Relation",
+		filters={"customer": doc.customer, "parenttype": "Customer Family"},
+		fields=["parent"]
+	)
+
+	if not relations:
+		return
+
+	for rel in relations:
+		discount_pct = frappe.db.get_value("Customer Family", rel.parent, "family_discount_pct")
+		if flt(discount_pct) > 0:
+			doc.additional_discount_percentage = flt(discount_pct)
+			frappe.msgprint(
+				frappe._("Applied {0}% Family Discount (via <b>{1}</b>)").format(
+					discount_pct, rel.parent
+				),
+				indicator="green",
+				alert=True
+			)
+			break
+
