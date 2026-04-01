@@ -398,6 +398,13 @@ def _resolve_commission_rate(settings, sales_person, role, is_first, level, base
 	if level == 0:
 		return flt(settings.onetime_salesperson_pct) if is_first else flt(settings.recurring_salesperson_pct)
 	else:
+		# Check multi-level defaults first (if enabled)
+		if getattr(settings, "enable_multi_level_commission", 0):
+			for row in getattr(settings, "multi_level_defaults", []):
+				if row.hierarchy_level == level:
+					return flt(row.onetime_pct) if is_first else flt(row.recurring_pct)
+
+		# Fallback to standard generic manager pct
 		return flt(settings.onetime_manager_pct) if is_first else flt(settings.recurring_manager_pct)
 
 

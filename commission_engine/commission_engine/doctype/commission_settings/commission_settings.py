@@ -11,7 +11,13 @@ class CommissionSettings(Document):
 
 	if TYPE_CHECKING:
 		from frappe.types import DF
-		from commission_engine.commission_engine.doctype.commission_rate_override.commission_rate_override import CommissionRateOverride
+
+		from commission_engine.commission_engine.doctype.commission_level_default.commission_level_default import (
+			CommissionLevelDefault,
+		)
+		from commission_engine.commission_engine.doctype.commission_rate_override.commission_rate_override import (
+			CommissionRateOverride,
+		)
 
 		auto_create_journal_entry: DF.Check
 		commission_expense_account: DF.Link | None
@@ -23,6 +29,7 @@ class CommissionSettings(Document):
 		max_commission_levels: DF.Int
 		maximum_commission_cap: DF.Currency
 		minimum_commission_threshold: DF.Currency
+		multi_level_defaults: DF.Table[CommissionLevelDefault]
 		onetime_manager_pct: DF.Percent
 		onetime_salesperson_pct: DF.Percent
 		recurring_manager_pct: DF.Percent

@@ -22,6 +22,7 @@
         "enable_approval_workflow",
         "enable_multi_level_commission",
         "max_commission_levels",
+        "multi_level_defaults",
         "minimum_commission_threshold",
         "col_break3",
         "maximum_commission_cap",
@@ -143,6 +144,14 @@
             "fieldtype": "Int",
             "label": "Max Commission Levels",
             "description": "Maximum depth to walk up the Sales Person tree (safety limit)",
+            "depends_on": "eval:doc.enable_multi_level_commission"
+        },
+        {
+            "fieldname": "multi_level_defaults",
+            "fieldtype": "Table",
+            "label": "Multi-Level Global Defaults",
+            "options": "Commission Level Default",
+            "description": "Define default rates for Level 1 (Manager), Level 2 (Regional), etc. If a level is not defined here, it falls back to the standard Manager % below.",
             "depends_on": "eval:doc.enable_multi_level_commission"
         },
         {

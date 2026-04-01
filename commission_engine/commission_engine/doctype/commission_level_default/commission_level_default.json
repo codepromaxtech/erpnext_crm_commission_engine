@@ -1,0 +1,47 @@
+{
+    "actions": [],
+    "creation": "2026-04-01 00:00:00",
+    "doctype": "DocType",
+    "engine": "InnoDB",
+    "field_order": [
+        "hierarchy_level",
+        "onetime_pct",
+        "recurring_pct"
+    ],
+    "fields": [
+        {
+            "fieldname": "hierarchy_level",
+            "fieldtype": "Int",
+            "in_list_view": 1,
+            "label": "Hierarchy Level",
+            "reqd": 1,
+            "description": "Level 1 = Direct Manager, Level 2 = Manager's Manager, etc."
+        },
+        {
+            "fieldname": "onetime_pct",
+            "fieldtype": "Percent",
+            "in_list_view": 1,
+            "label": "One-Time Commission %",
+            "reqd": 1
+        },
+        {
+            "fieldname": "recurring_pct",
+            "fieldtype": "Percent",
+            "in_list_view": 1,
+            "label": "Recurring Commission %",
+            "reqd": 1
+        }
+    ],
+    "istable": 1,
+    "links": [],
+    "modified": "2026-04-01 00:00:00",
+    "modified_by": "Administrator",
+    "module": "Commission Engine",
+    "name": "Commission Level Default",
+    "owner": "Administrator",
+    "permissions": [],
+    "sort_field": "modified",
+    "sort_order": "DESC",
+    "states": [],
+    "track_changes": 0
+}
