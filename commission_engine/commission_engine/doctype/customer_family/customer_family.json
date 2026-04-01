@@ -11,6 +11,8 @@
         "primary_customer",
         "col_break1",
         "family_status",
+        "pricing_section",
+        "family_discount_pct",
         "members_section",
         "members",
         "notes_section",
@@ -52,6 +54,17 @@
             "options": "Active\nInactive",
             "in_list_view": 1,
             "in_standard_filter": 1
+        },
+        {
+            "fieldname": "pricing_section",
+            "fieldtype": "Section Break",
+            "label": "Pricing & Billing"
+        },
+        {
+            "fieldname": "family_discount_pct",
+            "fieldtype": "Percent",
+            "label": "Family Discount %",
+            "description": "Auto-applied to Sales Invoices for all members of this family"
         },
         {
             "fieldname": "members_section",

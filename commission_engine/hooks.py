@@ -136,7 +136,10 @@ has_permission = {
 
 doc_events = {
 	"Sales Invoice": {
-		"validate": "commission_engine.sales_invoice_hooks.auto_populate_sales_team",
+		"validate": [
+			"commission_engine.sales_invoice_hooks.auto_populate_sales_team",
+			"commission_engine.customer_hooks.apply_family_discount"
+		],
 		"on_submit": "commission_engine.commission_engine.doctype.commission_entry.commission_entry.create_commission_entries",
 		"on_cancel": "commission_engine.commission_engine.doctype.commission_entry.commission_entry.cancel_commission_entries",
 	},
