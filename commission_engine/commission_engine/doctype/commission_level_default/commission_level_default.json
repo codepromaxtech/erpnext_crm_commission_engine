@@ -5,6 +5,7 @@
     "engine": "InnoDB",
     "field_order": [
         "hierarchy_level",
+        "level_title",
         "onetime_pct",
         "recurring_pct"
     ],
@@ -15,7 +16,16 @@
             "in_list_view": 1,
             "label": "Hierarchy Level",
             "reqd": 1,
-            "description": "Level 1 = Direct Manager, Level 2 = Manager's Manager, etc."
+            "description": "Level 1 = Direct Manager, Level 2 = Manager's Manager",
+            "columns": 2
+        },
+        {
+            "fieldname": "level_title",
+            "fieldtype": "Data",
+            "in_list_view": 1,
+            "label": "Level Title (Optional)",
+            "description": "e.g., Area Manager, District Manager",
+            "columns": 3
         },
         {
             "fieldname": "onetime_pct",
