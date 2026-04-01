@@ -1,119 +1,104 @@
-# Commission Engine for ERPNext
+# 🚀 Commission Engine for ERPNext
 
-A production-ready multi-level sales commission system for ERPNext v16 that automates
-the entire CRM-to-commission workflow—from lead conversion to commission payout.
+An enterprise-grade, highly configurable Commission Management application for ERPNext. Designed for teams with complex sales structures, multi-level hierarchies, tiered goals, and strict financial controls.
 
-## Features
+---
 
-### Core Commission Flow
-- **Automated Commission Generation** — Commission Entries auto-created when Sales Invoice is submitted
-- **Separate Entries per Person** — Salesperson and Manager each get their own independent entry with separate payments
-- **First vs Recurring Detection** — Different rates for first invoice vs subsequent invoices per customer
-- **Credit Note Handling** — Negative reversal entries auto-created when credit notes/returns are submitted
-- **Clawback** — If an invoice is cancelled after commission is already paid, a reversal entry + reversal Journal Entry is auto-created
-- **Amended Invoice Support** — When an invoice is amended, old commission entries are cancelled and new ones are created
+## ✨ Key Features
 
-### Commission Settings
-- **Global Default Rates** — One-Time and Recurring rates for Salesperson and Manager
-- **Individual Rate Overrides** — Override rates per Sales Person via the override table
-- **Tiered Commission Rates** — Define rate tiers based on cumulative monthly sales (e.g., 9% up to $10K, 12% above)
-- **Minimum Threshold** — Skip commission entries below a specified amount
-- **Maximum Cap** — Cap commission amount per entry at a maximum value
-- **Multi-Currency** — Tracks invoice currency and exchange rate on each entry
+1. **Dynamic Multi-Level Commission Hierarchy**
+   - Supports unlimited depths of management (Sales Manager, Regional Manager, VP, etc.) using ERPNext's native Sales Person tree.
+   - Global default rates per hierarchy level.
+2. **Four-Level Rate Resolution Priority**
+   - **Priority 1:** Specific Person Override (e.g., John gets 15%, regardless of his level).
+   - **Priority 2:** Volume-Based Tiers (e.g., 5% up to $10k, 10% for $10k+).
+   - **Priority 3:** Standard Sales Person Rate (ERPNext built-in setting).
+   - **Priority 4:** Global Level Default (e.g., All Level 2 Managers get 3%).
+3. **One-Time vs. Recurring Differentiators**
+   - Reward hunters vs. farmers by offering different rates for a customer's First Invoice vs. Subsequent Invoices.
+4. **Smart Clawbacks (Return/Credit Note Support)**
+   - Fully automated financial integrity: When an invoice is returned, the system automatically creates negative Commission Entries to claw back the exact amount paid.
+5. **Approval Workflow & Accounting Integration**
+   - Multi-stage approval (Pending -> Approved -> Paid).
+   - Auto-generates Journal Entries for Commission Expense vs. Payable upon approval.
+6. **Customer Family & Protection System**
+   - Group related customers (Parent, Subsidiary, Spouse).
+   - **Sales Protection:** Only a manager in the salesperson's direct upline can re-assign a customer's sales team.
+   - **Family Discounts:** Auto-magically applies a master Family Discount % to any sales invoice generated for a family member.
 
-### Approval Workflow
-- **Configurable Approval** — Toggle `Enable Approval Workflow` in Commission Settings
-- **Status Flow**: `Pending → Approved → Paid` (or `Pending → Paid` when approval is off)
-- **Approval Tracking** — Records who approved and when
-- **Bulk Approve** — Approve multiple entries from the list view
+---
 
-### Commission Period Locking
-- **Commission Period** doctype (`/app/commission-period`)
-- Lock a month (e.g., 2026-03-01) to prevent modifications to entries in that period
-- Auto-summary stats (total entries, total commission, total paid)
-- Reversals and clawbacks bypass the period lock (so they can always be created)
+## 🏗️ Architecture & Data Flow
 
-### Accounting Integration
-- **Auto Journal Entry** — On payment, a Journal Entry is auto-created (Debit: Expense, Credit: Payable)
-- **Reversal JE** — Negative Journal Entries for clawback/return scenarios
-- **Commission Accounts** — Auto-created on install (`Commission Expense` + `Commission Payable`)
+When a **Sales Invoice** is Submitted, the engine springs into action. Here is the visual workflow:
 
-### CRM Integration
-- **Lead → Customer** — When a Customer is created from a Lead, the Lead Owner's Sales Person is auto-tagged
-- **Sales Person Resolution** — User → Employee → Sales Person (with fallback name matching)
-- **Manager Resolution** — Auto-resolved from the Sales Person tree hierarchy (parent node)
-- **Subscription Support** — Subscription-generated invoices auto-inherit the customer's sales_team via `validate` hook
-
-### Role-Based Access Control
-- **Sales User** — Can only see their own commission entries
-- **Sales Manager** — Can see their own + team members' entries (via NestedSet hierarchy)
-- **Accounts User / System Manager** — Can see all entries
-
-### UI Features
-- **Rich Dashboard** — Stat cards showing Invoice Amount, Commission, and Status on each entry
-- **Role Badges** — 🔵 Salesperson / 🟠 Manager badges in list view and form
-- **5 Status Indicators** — ⏳ Pending, ✔️ Approved, ✅ Paid, ❌ Cancelled, ↩️ Reversed
-- **Payment Dialog** — Detailed confirmation dialog showing payout breakdown + JE preview
-- **Bulk Actions** — Bulk Approve and Bulk Mark as Paid from list view
-- **Quick Filters** — One-click filters for status, role, and type
-- **Email Notifications** — Auto-sends email to the payee when their commission is paid
-
-### Reports
-- **Commission Summary** — Filterable report with chart, grouped by Sales Person
-- **Filters**: Date range, Sales Person, Role, Commission Type, Status, Company
-- **Summary Cards**: Salesperson total, Manager total, Grand Total, Pending, Approved
-- **Export**: Standard ERPNext CSV/Excel export
-
-## Installation
-
-```bash
-cd /path/to/frappe-bench
-bench get-app https://github.com/codepromaxtech/erpnext_crm_commission_engine.git
-bench --site your-site install-app commission_engine
-bench --site your-site migrate
-bench build --app commission_engine
-sudo supervisorctl restart all
+```mermaid
+flowchart TD
+    A[Sales Invoice Submitted] --> B{Has Sales Team?}
+    B -- No --> C[Stop]
+    B -- Yes --> D[Iterate over Sales Persons]
+    D --> E{Multi-Level Enabled?}
+    E -- No --> F[Calculate for direct Sales Person & 1 Manager]
+    E -- Yes --> G[Walk up Sales Person Tree to Max Depth]
+    G --> H[Resolve Commission Rate]
+    F --> H
+    H --> I{Check Rate Priorities}
+    I -->|1. Override| J[Assign Override Rate]
+    I -->|2. Tiered| K[Assign Tier Rate based on Monthly Volume]
+    I -->|3. Standard| L[Assign Sales Person Built-in Rate]
+    I -->|4. Global| M[Assign Level-Specific Default]
+    J --> N[Determine One-Time vs Recurring]
+    K --> N
+    L --> N
+    M --> N
+    N --> O(Create Commission Entry - Pending)
 ```
 
-## Configuration
+---
 
-1. Navigate to **Commission Settings** (`/app/commission-settings`)
-2. Set **One-Time** and **Recurring** commission rates for Salesperson and Manager
-3. Configure **Commission Expense Account** and **Commission Payable Account**
-4. Optionally enable:
-   - **Approval Workflow** — require approval before payment
-   - **Tiered Commission** — rate tiers based on cumulative sales
-   - **Minimum Threshold** — skip tiny commissions
-   - **Maximum Cap** — cap large commissions
+## 🔄 The Lifecycle of a Commission
 
-## Prerequisites
+### 1. Generation
+* The engine triggers on `Sales Invoice (on_submit)`.
+* It calculates the Allocated Amount for each salesperson.
+* It traces up the management tree and creates a `Commission Entry` child for everyone in the upline entitled to a percentage.
 
-For the commission engine to work correctly:
+### 2. Approval
+* Finance/Sales Admins review the generated `Commission Entry` docs.
+* Using the **Commission Summary Report**, managers can instantly see total liabilities.
+* The entry is transitioned from `Pending` -> `Approved`.
 
-1. **Sales Person Tree** — At least one Sales Person must exist in the Sales Person tree
-2. **Employee Link** — Each Sales Person should be linked to an Employee
-3. **User Link** — Each Employee should have a `user_id` (ERPNext user)
-4. **Customer Sales Team** — Each Customer should have a Sales Person in the `sales_team` child table
+### 3. Accounting & Payment (Optional)
+* If `Auto-Create Journal Entry` is enabled in settings, approving an entry will automatically post a Journal Entry debiting your `Commission Expense Account` and crediting the `Commission Payable Account`.
+* Once actually paid out via Payroll or standard Payment Entry, the status is moved to `Paid`.
 
-## Doctypes
+---
 
-| Doctype | Type | Description |
-|---------|------|-------------|
-| Commission Settings | Single | Global configuration (rates, accounts, thresholds) |
-| Commission Entry | Document | Individual commission record per person per invoice |
-| Commission Rate Override | Child Table | Per-person rate overrides in Commission Settings |
-| Commission Tier | Child Table | Tiered rate definitions in Commission Settings |
-| Commission Period | Document | Monthly period locking (Open/Locked) |
+## 👨‍👩‍👧‍👦 Customer Family & Protection
 
-## API
+The Customer Family system adds crucial CRM capabilities for B2B and nested B2C sales.
 
-| Endpoint | Description |
-|----------|-------------|
-| `commission_engine.api.bulk_mark_as_paid` | Bulk pay multiple entries |
-| `commission_engine.api.bulk_approve` | Bulk approve multiple entries |
-| `commission_engine.api.get_commission_dashboard` | Dashboard data for workspace |
-| `commission_engine.customer_hooks.resolve_sales_person_from_lead` | Resolve Lead Owner to Sales Person |
+```mermaid
+erDiagram
+    CUSTOMER_FAMILY ||--|{ CUSTOMER_RELATION : "has members"
+    CUSTOMER_RELATION }|--|| CUSTOMER : "links to"
+    
+    CUSTOMER_FAMILY {
+        string family_name
+        float family_discount_pct
+        string primary_customer
+    }
+```
 
-## License
+* **Protection:** To prevent salespeople from stealing accounts, the system enforces strict hierarchy rules. If Sales Person A is assigned to a Customer, Sales Person B *cannot* change it. Only Sales Person A's direct Manager (or System Admin) can re-assign the account.
+* **Auto-Discount:** Creating an invoice for any `Customer` will dynamically check their `Customer Family`. If the family has a `family_discount_pct` of 10%, a 10% Additional Discount is immediately injected into the invoice.
 
-MIT
+---
+
+## ⚙️ Configuration Setup
+
+1. Search for **Commission Settings** in the awesomebar.
+2. Select your default Expense and Payable tracking accounts.
+3. Define your **Commission Level Defaults** for different tiers of management.
+4. Set optional **Minimum Invoice Thresholds** (invoices below this skip commission) and **Maximum Caps** (limits max payout on whale deals).
+5. Toggle **Enable Approval Workflow** to lock entries from being manipulated by non-admins.
